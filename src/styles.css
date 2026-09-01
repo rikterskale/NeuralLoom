@@ -1,0 +1,140 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-background: #0b0c0e;
+  --color-foreground: #ecece8;
+  --color-card: #141518;
+  --color-card-foreground: #ecece8;
+  --color-popover: #1a1b1f;
+  --color-popover-foreground: #ecece8;
+  --color-primary: #c5cdd8;
+  --color-primary-foreground: #0b0c0e;
+  --color-secondary: #1c1d22;
+  --color-secondary-foreground: #ecece8;
+  --color-muted: #1c1d22;
+  --color-muted-foreground: #8d8e8b;
+  --color-accent: #22242a;
+  --color-accent-foreground: #ecece8;
+  --color-destructive: #c45c4a;
+  --color-destructive-foreground: #ecece8;
+  --color-border: rgb(255 255 255 / 0.08);
+  --color-input: rgb(255 255 255 / 0.08);
+  --color-ring: #c5cdd8;
+  --color-ok: #8aa58c;
+  --color-warn: #c4b08a;
+
+  --radius: 0.75rem;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+@layer base {
+  :root {
+    --shadow-border: 0 0 0 1px rgb(255 255 255 / 0.08);
+    --shadow-border-hover: 0 0 0 1px rgb(255 255 255 / 0.14);
+    --motion-stagger: 40ms;
+    --motion-micro: 80ms;
+    --motion-quick: 150ms;
+    --motion-fast: 250ms;
+    --motion-medium: 350ms;
+    --motion-slow: 400ms;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .weave-bg {
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        rgb(255 255 255 / 0.028) 0 1px,
+        transparent 1px 32px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        rgb(255 255 255 / 0.02) 0 1px,
+        transparent 1px 40px
+      );
+  }
+
+  .stagger-in > * {
+    animation: loom-in 400ms var(--ease-smooth-out) both;
+  }
+  .stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-in > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-in > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-in > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-in > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-in > *:nth-child(6) { animation-delay: 250ms; }
+  .stagger-in > *:nth-child(7) { animation-delay: 300ms; }
+  .stagger-in > *:nth-child(8) { animation-delay: 350ms; }
+}
+
+@keyframes loom-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-in > * {
+    animation: none;
+  }
+}
