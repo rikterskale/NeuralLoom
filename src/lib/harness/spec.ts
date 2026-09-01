@@ -17,7 +17,7 @@ export const HARNESS_SPEC = {
     },
   },
   data_policy: {
-    default_action: "deny" as const,
+    default_action: "deny_by_default" as const,
     routing_guards: {
       classify_before_model_call: true,
       preserve_data_class_across_fallbacks: true,
@@ -30,12 +30,12 @@ export const HARNESS_SPEC = {
     model_may_generate_code: true,
     model_may_generate_patch: true,
     command_execution: {
-      default: "deny" as const,
+      default: "deny_by_default" as const,
       sandbox_required: true,
       network_access: "deny_by_default" as const,
       filesystem_access: "workspace_only" as const,
-      secrets_access: "deny" as const,
-      privileged_execution: "deny" as const,
+      secrets_access: "deny_by_default" as const,
+      privileged_execution: "deny_by_default" as const,
     },
     target_controls: {
       authorization_record_required: true,

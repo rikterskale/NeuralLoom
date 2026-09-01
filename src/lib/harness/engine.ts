@@ -56,7 +56,7 @@ export function evaluateDispatch(input: DispatchInput, inventory: ModelRecord[])
 
   if (classification.lane === "unknown") {
     status = "blocked";
-    blockReason = "Unknown data class blocked (default deny).";
+    blockReason = "Unknown data class blocked (deny by default).";
   } else if (classification.lane === "local_only") {
     status = "blocked";
     blockReason = "Local-only data cannot leave the operator workstation. Cloud transport refused.";

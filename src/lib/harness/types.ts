@@ -151,8 +151,8 @@ export type ExecutionDecision = {
   sandboxRequired: boolean;
   networkAccess: "deny" | "allowlisted";
   filesystemAccess: "workspace_only";
-  secretsAccess: "deny";
-  privilegedExecution: "deny";
+  secretsAccess: "deny_by_default";
+  privilegedExecution: "deny_by_default";
   pendingApprovals: HumanApprovalAction[];
   targetControlFailures: string[];
 };

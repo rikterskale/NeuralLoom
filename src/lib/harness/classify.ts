@@ -117,7 +117,7 @@ export function classifyPayload(text: string, tagged: KnownDataClass[]): Classif
   const redactionRequired = classes.some((c) => REDACTION_CLASSES.has(c as KnownDataClass));
 
   if (classes.length === 0) {
-    reasons.push("No data class tagged — default deny, unknown blocked");
+    reasons.push("No data class tagged — deny by default, unknown blocked");
   }
 
   return {

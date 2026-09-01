@@ -47,7 +47,7 @@ function CommandCenter() {
               : "Checks at startup"
           }
         />
-        <Stat label="Data policy" value="Default deny" detail="Unknown classes blocked" />
+        <Stat label="Data policy" value="Deny by default" detail="Unknown classes blocked" />
         <Stat
           label="Generated commands"
           value="Not executed"

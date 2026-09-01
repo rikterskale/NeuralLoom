@@ -56,8 +56,9 @@ export function evaluateExecution(
         ? "allowlisted"
         : "deny",
     filesystemAccess: "workspace_only",
-    secretsAccess: "deny",
-    privilegedExecution: "deny",
+    secretsAccess: HARNESS_SPEC.execution_policy.command_execution.secrets_access,
+    privilegedExecution:
+      HARNESS_SPEC.execution_policy.command_execution.privileged_execution,
     pendingApprovals,
     targetControlFailures,
   };

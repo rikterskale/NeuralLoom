@@ -68,12 +68,12 @@ function PolicyPage() {
           <CardContent className="space-y-3">
             <GuardRow label="Model may generate code" on={exec.model_may_generate_code} />
             <GuardRow label="Model may generate patch" on={exec.model_may_generate_patch} />
-            <GuardRow label="Command execution default deny" on />
+            <GuardRow label="Command execution deny by default" on />
             <GuardRow label="Sandbox required" on={exec.command_execution.sandbox_required} />
             <GuardRow label="Network deny by default" on />
             <GuardRow label="Filesystem workspace only" on />
-            <GuardRow label="Secrets access deny" on />
-            <GuardRow label="Privileged execution deny" on />
+            <GuardRow label="Secrets access deny by default" on />
+            <GuardRow label="Privileged execution deny by default" on />
           </CardContent>
         </Card>
 
