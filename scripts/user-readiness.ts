@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium, type BrowserContext, type Page } from "playwright";
+import { GROK_EXTENSIONS_SCRIPT_SRC } from "./grok-pwa-shared.mjs";
 import { allConfiguredModels, defaultModelSettings } from "../src/lib/harness/spec.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -117,6 +118,13 @@ async function main() {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       reducedMotion: "reduce",
+    });
+    await context.route(GROK_EXTENSIONS_SCRIPT_SRC, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: "/* Platform banner stubbed by the deterministic readiness harness. */",
+      });
     });
     context.setDefaultTimeout(Math.min(CASE_TIMEOUT_MS, 15_000));
     context.setDefaultNavigationTimeout(Math.min(CASE_TIMEOUT_MS, 20_000));

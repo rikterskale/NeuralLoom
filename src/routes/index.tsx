@@ -7,7 +7,12 @@ import { LaneChip, RunStatusChip } from "@/components/status-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ROLE_BLURBS, ROLE_CATALOG, HARNESS_SPEC } from "@/lib/harness/spec";
+import {
+  HARNESS_SPEC,
+  readyTaskRoles,
+  ROLE_BLURBS,
+  ROLE_CATALOG,
+} from "@/lib/harness/spec";
 import { relativeTime } from "@/lib/harness/labels";
 import { useHarness } from "@/lib/harness/store";
 import { ROLE_IDS } from "@/lib/harness/types";
@@ -25,6 +30,16 @@ function CommandCenter() {
   const visibleRuns = mounted ? runs.slice(0, 5) : [];
   const blocked = mounted ? runs.filter((r) => r.status === "blocked").length : 0;
   const accepted = mounted ? runs.filter((r) => r.status === "accepted").length : 0;
+  const readyRoles = discovery
+    ? readyTaskRoles(discovery.inventory, discovery.roleModels).length
+    : 0;
+  const modelStatus = !discovery
+    ? "Checking"
+    : discovery.error
+      ? "Unavailable"
+      : readyRoles > 0
+        ? `${readyRoles} role${readyRoles === 1 ? "" : "s"} ready`
+        : "Setup needed";
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -58,9 +73,13 @@ function CommandCenter() {
         />
         <Stat
           label="Model status"
-          value={unavailable.length ? `${unavailable.length} unavailable` : "Ready"}
+          value={modelStatus}
           detail={
-            mounted && lastDiscoveryAt ? `Checked ${relativeTime(lastDiscoveryAt)}` : "Checking now"
+            discovery && unavailable.length
+              ? `${unavailable.length} approved model${unavailable.length === 1 ? "" : "s"} unavailable`
+              : mounted && lastDiscoveryAt
+                ? `Checked ${relativeTime(lastDiscoveryAt)}`
+                : "Checking now"
           }
         />
         <Stat label="Data safety" value="Private by default" detail="Unknown information blocked" />
