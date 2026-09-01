@@ -1,14 +1,17 @@
 import { ROLE_CATALOG } from "./spec.ts";
-import type { Classification, ModelRecord, RoleId, RouteDecision } from "./types.ts";
+import type {
+  Classification,
+  ModelRecord,
+  RoleConfig,
+  RoleId,
+  RouteDecision,
+  TaskRoleId,
+} from "./types.ts";
 
-const ROLE_HINTS: { role: RoleId; re: RegExp }[] = [
+const ROLE_HINTS: { role: TaskRoleId; re: RegExp }[] = [
   {
     role: "security_specialist",
     re: /\b(cve|vulnerab|exploit|poc|payload|threat model|attack path|mitre|red team|offensive)\b/i,
-  },
-  {
-    role: "critic",
-    re: /\b(review (this|the)|diff review|hallucin|test gap|second pair)\b/i,
   },
   {
     role: "repo_agent",
@@ -28,7 +31,7 @@ const ROLE_HINTS: { role: RoleId; re: RegExp }[] = [
   },
 ];
 
-export function autoRole(objective: string): RoleId {
+export function autoRole(objective: string): TaskRoleId {
   for (const hint of ROLE_HINTS) {
     if (hint.re.test(objective)) return hint.role;
   }
@@ -36,16 +39,17 @@ export function autoRole(objective: string): RoleId {
 }
 
 export function routeRole(opts: {
-  requested: RoleId | "auto";
+  requested: TaskRoleId | "auto";
   objective: string;
   classification: Classification;
   inventory: ModelRecord[];
   simulatePrimaryFailure: boolean;
   failClosedWhenPrimaryMissing: boolean;
   preventUnapprovedSubstitution: boolean;
+  catalog?: Record<RoleId, RoleConfig>;
 }): RouteDecision {
   const role = opts.requested === "auto" ? autoRole(opts.objective) : opts.requested;
-  const config = ROLE_CATALOG[role];
+  const config = (opts.catalog ?? ROLE_CATALOG)[role];
   const available = new Map(opts.inventory.map((m) => [m.name, m]));
 
   if (opts.classification.lane === "local_only") {

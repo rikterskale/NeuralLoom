@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { refreshModelDiscovery } from "@/lib/harness/api";
+import { readyTaskRoles } from "@/lib/harness/spec";
 import { useHarness } from "@/lib/harness/store";
 
 export function ReadinessAlert({ compact = false }: { compact?: boolean }) {
@@ -26,8 +27,8 @@ export function ReadinessAlert({ compact = false }: { compact?: boolean }) {
   }
 
   const error = loadError ?? discovery?.error;
-  const available = discovery?.inventory.filter((model) => model.available).length ?? 0;
-  if (!error && available > 0) return null;
+  const readyRoles = discovery ? readyTaskRoles(discovery.inventory, discovery.roleModels) : [];
+  if (!error && readyRoles.length > 0) return null;
 
   async function retry() {
     setRefreshing(true);
@@ -52,11 +53,11 @@ export function ReadinessAlert({ compact = false }: { compact?: boolean }) {
         <CircleAlert className="mt-0.5 size-5 shrink-0 text-warn" />
         <div className="min-w-0 flex-1">
           <h2 id="readiness-title" className="font-medium">
-            AI models are not ready yet
+            A complete AI review path is not ready yet
           </h2>
           {!compact ? (
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Open Ollama, sign in, and add an approved cloud model. Run
+              Open Ollama, sign in, and add the recommended task and critic models. Run
               <code className="mx-1 rounded bg-background/60 px-1.5 py-0.5 font-mono text-xs">
                 npm run doctor
               </code>

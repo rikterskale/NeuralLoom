@@ -60,6 +60,7 @@ test("the app schema is globbed and the template auth source remains available",
   const migrationsDir = join(projectRoot(), "migrations");
   assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), []), [
     { name: "0001_neuralloom.sql", path: "0001_neuralloom.sql" },
+    { name: "0002_model_settings.sql", path: "0002_model_settings.sql" },
   ]);
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
 });

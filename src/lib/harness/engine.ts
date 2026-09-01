@@ -9,6 +9,8 @@ import type {
   ExecutionDecision,
   HarnessRun,
   ModelRecord,
+  RoleConfig,
+  RoleId,
   RouteDecision,
   RunStatus,
 } from "./types.ts";
@@ -34,7 +36,11 @@ function event(
   return { at: new Date().toISOString(), kind, summary, fields };
 }
 
-export function evaluateDispatch(input: DispatchInput, inventory: ModelRecord[]): PolicySnapshot {
+export function evaluateDispatch(
+  input: DispatchInput,
+  inventory: ModelRecord[],
+  catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG,
+): PolicySnapshot {
   const classification = classifyPayload(input.objective, input.taggedClasses);
   const routed = routeRole({
     requested: input.role,
@@ -46,6 +52,7 @@ export function evaluateDispatch(input: DispatchInput, inventory: ModelRecord[])
       HARNESS_SPEC.cloud_primary.model_discovery.fail_closed_when_primary_missing,
     preventUnapprovedSubstitution:
       HARNESS_SPEC.cloud_primary.model_discovery.prevent_unapproved_model_substitution,
+    catalog,
   });
   const execution = evaluateExecution(input, classification);
   const authOk = authorizationSatisfied(classification, input.authorizationGranted);
@@ -80,7 +87,7 @@ export function evaluateDispatch(input: DispatchInput, inventory: ModelRecord[])
   const title =
     input.title.trim() ||
     input.objective.trim().slice(0, 72) ||
-    `${ROLE_CATALOG[routed.role].label} run`;
+    `${catalog[routed.role].label} run`;
 
   return {
     title,

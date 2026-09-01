@@ -2,13 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ROLE_BLURBS, ROLE_CATALOG } from "@/lib/harness/spec";
+import { catalogForModelSettings, ROLE_BLURBS, ROLE_CATALOG } from "@/lib/harness/spec";
+import { useHarness } from "@/lib/harness/store";
 import { formatClass } from "@/lib/harness/labels";
 import { ROLE_IDS } from "@/lib/harness/types";
 
 export const Route = createFileRoute("/roles")({ component: RolesPage });
 
 function RolesPage() {
+  const discovery = useHarness((state) => state.discovery);
+  const catalog = discovery ? catalogForModelSettings(discovery.roleModels) : ROLE_CATALOG;
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
@@ -18,7 +21,7 @@ function RolesPage() {
       />
       <div className="grid gap-4 md:grid-cols-2">
         {ROLE_IDS.map((id) => {
-          const role = ROLE_CATALOG[id];
+          const role = catalog[id];
           return (
             <Card key={id}>
               <CardHeader>

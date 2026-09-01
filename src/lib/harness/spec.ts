@@ -1,5 +1,5 @@
-import type { ModelRecord, RoleConfig, RoleId } from "./types.ts";
-import { ROLE_IDS } from "./types.ts";
+import type { ModelRecord, ModelSettings, RoleConfig, RoleId, TaskRoleId } from "./types.ts";
+import { ROLE_IDS, TASK_ROLE_IDS } from "./types.ts";
 
 export const PROMPT_TEMPLATE_VERSION = "neuralloom.role.v1";
 
@@ -163,20 +163,169 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   },
 };
 
-export function allConfiguredModels(): string[] {
+export type ModelChoice = {
+  name: string;
+  label: string;
+  description: string;
+};
+
+export const MODEL_CHOICES: Record<RoleId, ModelChoice[]> = {
+  planner: [
+    {
+      name: "deepseek-v4-pro:0813-cloud",
+      label: "Recommended",
+      description: "Best for careful plans and difficult decisions.",
+    },
+    {
+      name: "deepseek-v4-flash:0731-cloud",
+      label: "Faster",
+      description: "Quicker answers for everyday planning.",
+    },
+    {
+      name: "qwen3.5:397b-cloud",
+      label: "Alternative",
+      description: "A strong general-purpose backup.",
+    },
+  ],
+  coder: [
+    {
+      name: "kimi-k2.7-code:cloud",
+      label: "Recommended",
+      description: "Best balance for writing and reviewing code.",
+    },
+    {
+      name: "glm-5.3:cloud",
+      label: "More thorough",
+      description: "Useful for larger or more complex changes.",
+    },
+    {
+      name: "qwen3.5:397b-cloud",
+      label: "Alternative",
+      description: "A strong general-purpose backup.",
+    },
+  ],
+  repo_agent: [
+    {
+      name: "glm-5.3:cloud",
+      label: "Recommended",
+      description: "Best for understanding a whole project.",
+    },
+    {
+      name: "kimi-k3:cloud",
+      label: "Faster",
+      description: "Good for quicker project-wide questions.",
+    },
+    {
+      name: "mistral-large-3:675b-cloud",
+      label: "More thorough",
+      description: "Good for deep project analysis.",
+    },
+    {
+      name: "qwen3.5:397b-cloud",
+      label: "Alternative",
+      description: "A strong general-purpose backup.",
+    },
+  ],
+  security_specialist: [
+    {
+      name: "glm-5.3:cloud",
+      label: "Recommended",
+      description: "Best for careful security review.",
+    },
+    {
+      name: "kimi-k2.7-code:cloud",
+      label: "Code focused",
+      description: "Best when the security task is mostly code.",
+    },
+    {
+      name: "qwen3.5:397b-cloud",
+      label: "Alternative",
+      description: "A strong general-purpose backup.",
+    },
+  ],
+  critic: [
+    {
+      name: "gemma4:31b-cloud",
+      label: "Recommended",
+      description: "Independent second opinion for every task.",
+    },
+    {
+      name: "qwen3.5:397b-cloud",
+      label: "Faster",
+      description: "A quicker independent review.",
+    },
+    {
+      name: "mistral-large-3:675b-cloud",
+      label: "More thorough",
+      description: "A deeper independent review.",
+    },
+  ],
+  fast_triage: [
+    {
+      name: "deepseek-v4-flash:0731-cloud",
+      label: "Recommended",
+      description: "Fastest choice for sorting and summarizing.",
+    },
+    {
+      name: "qwen3.5:397b-cloud",
+      label: "Alternative",
+      description: "A strong general-purpose backup.",
+    },
+  ],
+};
+
+export function defaultModelSettings(): ModelSettings {
+  return Object.fromEntries(ROLE_IDS.map((id) => [id, ROLE_CATALOG[id].primary])) as ModelSettings;
+}
+
+export function parseModelSettings(value: unknown): ModelSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Choose one model for every role.");
+  }
+  const raw = value as Record<string, unknown>;
+  const settings = {} as ModelSettings;
+  for (const id of ROLE_IDS) {
+    const model = raw[id];
+    if (typeof model !== "string" || !MODEL_CHOICES[id].some((choice) => choice.name === model)) {
+      throw new Error(`The selected model does not work with ${ROLE_CATALOG[id].label}.`);
+    }
+    settings[id] = model;
+  }
+  return settings;
+}
+
+export function catalogForModelSettings(settings: ModelSettings): Record<RoleId, RoleConfig> {
+  return Object.fromEntries(
+    ROLE_IDS.map((id) => {
+      const primary = settings[id];
+      const fallbacks = MODEL_CHOICES[id]
+        .map((choice) => choice.name)
+        .filter((name) => name !== primary);
+      return [id, { ...ROLE_CATALOG[id], primary, fallbacks }];
+    }),
+  ) as Record<RoleId, RoleConfig>;
+}
+
+export function roleModelsFromCatalog(catalog: Record<RoleId, RoleConfig>): ModelSettings {
+  return Object.fromEntries(ROLE_IDS.map((id) => [id, catalog[id].primary])) as ModelSettings;
+}
+
+export function allConfiguredModels(catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG): string[] {
   const set = new Set<string>();
   for (const id of ROLE_IDS) {
-    const role = ROLE_CATALOG[id];
+    const role = catalog[id];
     set.add(role.primary);
     for (const fb of role.fallbacks) set.add(fb);
   }
   return [...set];
 }
 
-export function modelUsage(): Record<string, RoleId[]> {
+export function modelUsage(
+  catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG,
+): Record<string, RoleId[]> {
   const usage: Record<string, RoleId[]> = {};
   for (const id of ROLE_IDS) {
-    const role = ROLE_CATALOG[id];
+    const role = catalog[id];
     const names = [role.primary, ...role.fallbacks];
     for (const name of names) {
       usage[name] ??= [];
@@ -186,15 +335,43 @@ export function modelUsage(): Record<string, RoleId[]> {
   return usage;
 }
 
-export function buildInventory(unavailable: string[] = []): ModelRecord[] {
-  const usage = modelUsage();
-  return allConfiguredModels().map((name) => ({
+export function buildInventory(
+  unavailable: string[] = [],
+  catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG,
+): ModelRecord[] {
+  const usage = modelUsage(catalog);
+  return allConfiguredModels(catalog).map((name) => ({
     name,
     digest: "unverified",
     available: !unavailable.includes(name),
     source: "configured" as const,
     usedBy: usage[name] ?? [],
   }));
+}
+
+export function readyTaskRoles(
+  inventory: ModelRecord[],
+  settings: ModelSettings = defaultModelSettings(),
+): TaskRoleId[] {
+  const available = new Set(
+    inventory.filter((model) => model.available).map((model) => model.name),
+  );
+  if (!available.has(settings.critic)) return [];
+  return TASK_ROLE_IDS.filter((id) => available.has(settings[id]));
+}
+
+export function roleReadiness(
+  role: TaskRoleId,
+  inventory: ModelRecord[],
+  settings: ModelSettings = defaultModelSettings(),
+) {
+  const available = new Set(
+    inventory.filter((model) => model.available).map((model) => model.name),
+  );
+  return {
+    roleReady: available.has(settings[role]),
+    criticReady: available.has(settings.critic),
+  };
 }
 
 export function digestFor(_name: string): string {

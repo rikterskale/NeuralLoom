@@ -1,11 +1,16 @@
-import { allConfiguredModels, modelUsage } from "./spec";
-import type { ModelDiscovery, ModelRecord } from "./types";
+import { allConfiguredModels, modelUsage, roleModelsFromCatalog, ROLE_CATALOG } from "./spec";
+import type { ModelDiscovery, ModelRecord, RoleConfig, RoleId } from "./types";
 
 const DEFAULT_ENDPOINT = "http://127.0.0.1:11434";
 const DISCOVERY_TTL_MS = 60 * 60 * 1000;
 
 type OllamaTag = { name?: unknown; model?: unknown; digest?: unknown };
-type DiscoveryCache = { at: number; value: ModelDiscovery };
+type DiscoveryCache = {
+  at: number;
+  found: Map<string, { digest: string }>;
+  error: string | null;
+  endpoint: string;
+};
 
 const globalProvider = globalThis as typeof globalThis & {
   __neuralLoomDiscovery__?: DiscoveryCache;
@@ -28,20 +33,17 @@ function publicEndpoint(url: URL): string {
   return `${url.protocol}//${url.host}`;
 }
 
-export async function discoverModels(force = false): Promise<ModelDiscovery> {
+export async function discoverModels(
+  force = false,
+  catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG,
+): Promise<ModelDiscovery> {
   const cached = globalProvider.__neuralLoomDiscovery__;
-  if (!force && cached && Date.now() - cached.at < DISCOVERY_TTL_MS) return cached.value;
+  if (!force && cached && Date.now() - cached.at < DISCOVERY_TTL_MS) {
+    return buildDiscovery(catalog, cached.found, cached.error, cached.endpoint, cached.at);
+  }
 
   const url = endpoint();
-  const usage = modelUsage();
-  const configured = allConfiguredModels();
-  let inventory: ModelRecord[] = configured.map((name) => ({
-    name,
-    digest: "unavailable",
-    available: false,
-    source: "configured",
-    usedBy: usage[name] ?? [],
-  }));
+  let found = new Map<string, { digest: string }>();
   let error: string | null = null;
 
   try {
@@ -51,7 +53,7 @@ export async function discoverModels(force = false): Promise<ModelDiscovery> {
     });
     if (!response.ok) throw new Error(`Ollama discovery returned HTTP ${response.status}`);
     const body = (await response.json()) as { models?: OllamaTag[] };
-    const found = new Map<string, { digest: string }>();
+    found = new Map<string, { digest: string }>();
     for (const item of body.models ?? []) {
       const name =
         typeof item.name === "string"
@@ -64,26 +66,43 @@ export async function discoverModels(force = false): Promise<ModelDiscovery> {
         digest: typeof item.digest === "string" && item.digest ? item.digest : "unverified",
       });
     }
-    inventory = configured.map((name) => ({
-      name,
-      digest: found.get(name)?.digest ?? "unavailable",
-      available: found.has(name),
-      source: found.has(name) ? "discovered" : "configured",
-      usedBy: usage[name] ?? [],
-    }));
   } catch (cause) {
     error = cause instanceof Error ? cause.message : "Model discovery failed";
   }
 
-  const value: ModelDiscovery = {
+  const publicUrl = publicEndpoint(url);
+  globalProvider.__neuralLoomDiscovery__ = {
+    at: Date.now(),
+    found,
+    error,
+    endpoint: publicUrl,
+  };
+  return buildDiscovery(catalog, found, error, publicUrl, Date.now());
+}
+
+function buildDiscovery(
+  catalog: Record<RoleId, RoleConfig>,
+  found: Map<string, { digest: string }>,
+  error: string | null,
+  endpointUrl: string,
+  discoveredAt: number,
+): ModelDiscovery {
+  const usage = modelUsage(catalog);
+  const inventory: ModelRecord[] = allConfiguredModels(catalog).map((name) => ({
+    name,
+    digest: found.get(name)?.digest ?? "unavailable",
+    available: found.has(name),
+    source: found.has(name) ? "discovered" : "configured",
+    usedBy: usage[name] ?? [],
+  }));
+  return {
     inventory,
-    discoveredAt: new Date().toISOString(),
+    roleModels: roleModelsFromCatalog(catalog),
+    discoveredAt: new Date(discoveredAt).toISOString(),
     provider: "ollama",
-    endpoint: publicEndpoint(url),
+    endpoint: endpointUrl,
     error,
   };
-  globalProvider.__neuralLoomDiscovery__ = { at: Date.now(), value };
-  return value;
 }
 
 export type ModelCompletion = {

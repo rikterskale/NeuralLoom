@@ -8,6 +8,14 @@ export const ROLE_IDS = [
 ] as const;
 
 export type RoleId = (typeof ROLE_IDS)[number];
+export const TASK_ROLE_IDS = [
+  "planner",
+  "coder",
+  "repo_agent",
+  "security_specialist",
+  "fast_triage",
+] as const;
+export type TaskRoleId = (typeof TASK_ROLE_IDS)[number];
 
 export type ThinkLevel = "low" | "high" | "max";
 
@@ -117,6 +125,23 @@ export type RoleConfig = {
   think: ThinkLevel;
   temperature: number;
   responsibilities: string[];
+};
+
+export type ModelSettings = Record<RoleId, string>;
+
+export type ModelSettingsCheck = {
+  role: RoleId;
+  model: string;
+  compatible: boolean;
+  available: boolean;
+  message: string;
+};
+
+export type ModelSettingsResult = {
+  settings: ModelSettings;
+  discovery: ModelDiscovery;
+  checks: ModelSettingsCheck[];
+  savedAt: string;
 };
 
 export type ModelRecord = {
@@ -234,6 +259,7 @@ export type HarnessRun = {
 
 export type ModelDiscovery = {
   inventory: ModelRecord[];
+  roleModels: ModelSettings;
   discoveredAt: string;
   provider: "ollama";
   endpoint: string;
@@ -247,7 +273,7 @@ export type DispatchResult = {
 export type DispatchInput = {
   title: string;
   objective: string;
-  role: RoleId | "auto";
+  role: TaskRoleId | "auto";
   taggedClasses: KnownDataClass[];
   redactionVerified: boolean;
   authorizationGranted: boolean;

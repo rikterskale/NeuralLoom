@@ -4,7 +4,15 @@ import { redactRunForAudit } from "./audit-redaction.ts";
 import { classifyPayload } from "./classify.ts";
 import { parseCriticVerdict } from "./critic.ts";
 import { evaluateDispatch, materializeRun } from "./engine.ts";
-import { buildInventory } from "./spec.ts";
+import {
+  buildInventory,
+  catalogForModelSettings,
+  defaultModelSettings,
+  parseModelSettings,
+  readyTaskRoles,
+  ROLE_CATALOG,
+} from "./spec.ts";
+import { autoRole } from "./route.ts";
 import type { DispatchInput } from "./types.ts";
 import { validateDispatchInput } from "./validation.ts";
 import { assembleVerification } from "./verify.ts";
@@ -27,6 +35,7 @@ const baseInput: DispatchInput = {
 
 test("server validation rejects client-invented roles and actions", () => {
   assert.throws(() => validateDispatchInput({ ...baseInput, role: "admin" }), /Unsupported role/);
+  assert.throws(() => validateDispatchInput({ ...baseInput, role: "critic" }), /Unsupported role/);
   assert.throws(
     () => validateDispatchInput({ ...baseInput, requestedActions: ["run_anything"] }),
     /unsupported value/,
@@ -63,6 +72,48 @@ test("critic JSON must explicitly accept and cannot hide high findings", () => {
     false,
   );
   assert.equal(parseCriticVerdict("looks good").accepted, false);
+});
+
+test("automatic routing never uses the independent critic as the task author", () => {
+  assert.equal(autoRole("Review this example helper and suggest a refactor"), "coder");
+});
+
+test("readiness requires a task primary and the critic primary", () => {
+  const inventory = buildInventory();
+  const withoutCritic = inventory.map((model) => ({
+    ...model,
+    available: model.name !== ROLE_CATALOG.critic.primary,
+  }));
+  assert.deepEqual(readyTaskRoles(withoutCritic), []);
+
+  const starterModels = new Set([ROLE_CATALOG.coder.primary, ROLE_CATALOG.critic.primary]);
+  const starterInventory = inventory.map((model) => ({
+    ...model,
+    available: starterModels.has(model.name),
+  }));
+  assert.deepEqual(readyTaskRoles(starterInventory), ["coder"]);
+});
+
+test("model settings accept approved choices and drive runtime routing", () => {
+  const settings = {
+    ...defaultModelSettings(),
+    coder: "glm-5.3:cloud",
+    critic: "qwen3.5:397b-cloud",
+  };
+  assert.deepEqual(parseModelSettings(settings), settings);
+  assert.throws(
+    () => parseModelSettings({ ...settings, coder: "unapproved:latest" }),
+    /does not work with Coder/,
+  );
+
+  const catalog = catalogForModelSettings(settings);
+  const snapshot = evaluateDispatch(
+    { ...baseInput, role: "coder" },
+    buildInventory([], catalog),
+    catalog,
+  );
+  assert.equal(snapshot.route.selectedModel, "glm-5.3:cloud");
+  assert.equal(catalog.critic.primary, "qwen3.5:397b-cloud");
 });
 
 test("skipped checks and critic rejection both prevent acceptance", () => {

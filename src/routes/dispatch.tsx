@@ -15,17 +15,18 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { dispatchHarnessRun } from "@/lib/harness/api";
 import { ACTION_LABELS, formatClass } from "@/lib/harness/labels";
-import { ROLE_CATALOG } from "@/lib/harness/spec";
+import { autoRole } from "@/lib/harness/route";
+import { roleReadiness, ROLE_CATALOG } from "@/lib/harness/spec";
 import { useHarness } from "@/lib/harness/store";
 import {
   CONTEXT_INCLUDE,
   HUMAN_APPROVAL_ACTIONS,
-  ROLE_IDS,
+  TASK_ROLE_IDS,
   type DispatchInput,
   type HarnessRun,
   type HumanApprovalAction,
   type KnownDataClass,
-  type RoleId,
+  type TaskRoleId,
 } from "@/lib/harness/types";
 import { cn } from "@/lib/utils";
 
@@ -103,8 +104,12 @@ function DispatchPage() {
   );
   const objectiveReady = input.objective.trim().length >= 8;
   const authorizationReady = !explicitAuthorization || input.authorizationGranted;
+  const resolvedRole = input.role === "auto" ? autoRole(input.objective) : input.role;
+  const modelReadiness = discovery
+    ? roleReadiness(resolvedRole, discovery.inventory, discovery.roleModels)
+    : { roleReady: false, criticReady: false };
   const modelsReady = Boolean(
-    discovery && !discovery.error && discovery.inventory.some((model) => model.available),
+    discovery && !discovery.error && modelReadiness.roleReady && modelReadiness.criticReady,
   );
   const canSubmit =
     objectiveReady &&
@@ -242,11 +247,11 @@ function DispatchPage() {
                   <Choice active={input.role === "auto"} onClick={() => patch({ role: "auto" })}>
                     Automatic
                   </Choice>
-                  {ROLE_IDS.filter((id) => id !== "critic").map((id) => (
+                  {TASK_ROLE_IDS.map((id) => (
                     <Choice
                       key={id}
                       active={input.role === id}
-                      onClick={() => patch({ role: id as RoleId })}
+                      onClick={() => patch({ role: id as TaskRoleId })}
                     >
                       {ROLE_CATALOG[id].label}
                     </Choice>
@@ -333,9 +338,11 @@ function DispatchPage() {
                   ? "Choose the kind of information involved."
                   : !authorizationReady
                     ? "Confirm that you are authorized to share this material."
-                  : loadError || discovery?.error
-                    ? "Start Ollama and check again before submitting."
-                    : "An approved model must be available before submitting."}
+                    : loadError || discovery?.error
+                      ? "Start Ollama and check again before submitting."
+                      : !modelReadiness.roleReady
+                        ? `The model selected for ${ROLE_CATALOG[resolvedRole].label} is not ready yet.`
+                        : "The independent review model is not ready yet."}
             </p>
           ) : null}
         </div>
@@ -351,12 +358,14 @@ function DispatchPage() {
               <p>3. A separate critic reviews the response.</p>
               <p>4. Unfinished checks are shown honestly instead of silently passing.</p>
               <div className="pt-2">
-                <Badge variant={discovery?.error ? "deny" : discovery ? "ok" : "muted"}>
+                <Badge variant={discovery?.error ? "deny" : modelsReady ? "ok" : "warn"}>
                   {discovery?.error
                     ? "Models unavailable"
-                    : discovery
-                      ? "Models checked"
-                      : "Checking models"}
+                    : modelsReady
+                      ? "Review path ready"
+                      : discovery
+                        ? "Review path incomplete"
+                        : "Checking models"}
                 </Badge>
               </div>
             </CardContent>

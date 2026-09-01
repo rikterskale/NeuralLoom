@@ -4,9 +4,10 @@ import { detectSecrets } from "./classify";
 import { deleteRuns, readRuns, saveRun } from "./audit.server";
 import { parseCriticVerdict } from "./critic";
 import { evaluateDispatch, materializeRun } from "./engine";
+import { readModelSettings, writeModelSettings } from "./model-settings.server";
 import { criticSystemPrompt, roleSystemPrompt } from "./prompts";
 import { callOllama, discoverModels, type ModelCompletion } from "./provider.server";
-import { ROLE_CATALOG } from "./spec";
+import { catalogForModelSettings, parseModelSettings, ROLE_CATALOG } from "./spec";
 import type {
   AuditEvent,
   DispatchInput,
@@ -14,19 +15,55 @@ import type {
   HarnessRun,
   ModelDiscovery,
   ModelRecord,
+  ModelSettingsResult,
+  RoleConfig,
   RoleId,
 } from "./types";
+import { ROLE_IDS } from "./types";
 import { validateDispatchInput } from "./validation";
 import { assembleVerification, parseStructured } from "./verify";
 import { verifyArtifact } from "./workspace-checks.server";
 
 export const getModelDiscovery = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async (): Promise<ModelDiscovery> => discoverModels());
+  .handler(async ({ context }): Promise<ModelDiscovery> => {
+    const settings = await readModelSettings(context.userId);
+    return discoverModels(false, catalogForModelSettings(settings));
+  });
 
 export const refreshModelDiscovery = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .handler(async (): Promise<ModelDiscovery> => discoverModels(true));
+  .handler(async ({ context }): Promise<ModelDiscovery> => {
+    const settings = await readModelSettings(context.userId);
+    return discoverModels(true, catalogForModelSettings(settings));
+  });
+
+export const saveAndTestModelSettings = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((value: unknown) => parseModelSettings(value))
+  .handler(async ({ data, context }): Promise<ModelSettingsResult> => {
+    const settings = await writeModelSettings(context.userId, data);
+    const discovery = await discoverModels(true, catalogForModelSettings(settings));
+    const available = new Set(
+      discovery.inventory.filter((model) => model.available).map((model) => model.name),
+    );
+    return {
+      settings,
+      discovery,
+      savedAt: new Date().toISOString(),
+      checks: ROLE_IDS.map((role) => ({
+        role,
+        model: settings[role],
+        compatible: true,
+        available: available.has(settings[role]),
+        message: available.has(settings[role])
+          ? "Ready to use"
+          : discovery.error
+            ? "NeuralLoom cannot reach Ollama yet"
+            : "This model still needs to be added in Ollama",
+      })),
+    };
+  });
 
 export const listHarnessRuns = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -43,8 +80,10 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((value: unknown) => validateDispatchInput(value))
   .handler(async ({ data, context }): Promise<DispatchResult> => {
-    const discovery = await discoverModels();
-    const snapshot = evaluateDispatch(data, discovery.inventory);
+    const settings = await readModelSettings(context.userId);
+    const catalog = catalogForModelSettings(settings);
+    const discovery = await discoverModels(false, catalog);
+    const snapshot = evaluateDispatch(data, discovery.inventory, catalog);
     let run = materializeRun(snapshot);
     run = setDiscoveredDigest(run, discovery.inventory);
 
@@ -62,6 +101,7 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
         system: roleSystemPrompt(run.role),
         user: buildUserPrompt(run, data),
         maxTokens: run.role === "fast_triage" ? 500 : 900,
+        catalog,
       });
       run = applyActualRoute(run, primary);
 
@@ -76,11 +116,12 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
       const critic = await completeRoleWithFallback({
         role: "critic",
         inventory: discovery.inventory,
-        firstModel: ROLE_CATALOG.critic.primary,
+        firstModel: catalog.critic.primary,
         simulatePrimaryFailure: false,
         system: criticSystemPrompt(),
         user: `Review this ${run.role} artifact.\n\n${primary.completion.text}`,
         maxTokens: 500,
+        catalog,
       });
       const verdict = parseCriticVerdict(critic.completion.text);
       const checks = await verifyArtifact({
@@ -172,8 +213,9 @@ async function completeRoleWithFallback(opts: {
   system: string;
   user: string;
   maxTokens: number;
+  catalog?: Record<RoleId, RoleConfig>;
 }): Promise<CompletionRoute> {
-  const config = ROLE_CATALOG[opts.role];
+  const config = (opts.catalog ?? ROLE_CATALOG)[opts.role];
   const records = new Map(opts.inventory.map((model) => [model.name, model]));
   if (!records.get(config.primary)?.available) {
     throw new Error(`Required primary model ${config.primary} was not discovered`);

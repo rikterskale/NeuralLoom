@@ -16,6 +16,7 @@ export const Route = createFileRoute("/")({ component: CommandCenter });
 
 function CommandCenter() {
   const runs = useHarness((s) => s.runs);
+  const discovery = useHarness((s) => s.discovery);
   const lastDiscoveryAt = useHarness((s) => s.lastDiscoveryAt);
   const unavailable = useHarness((s) => s.unavailable);
   const [mounted, setMounted] = useState(false);
@@ -97,7 +98,7 @@ function CommandCenter() {
                 <span className="min-w-0 flex-1 sm:flex-[2]">
                   <span className="block font-medium sm:hidden">{role.label}</span>
                   <span className="block truncate font-mono text-xs text-muted-foreground">
-                    {role.primary}
+                    {discovery?.roleModels[id] ?? role.primary}
                   </span>
                 </span>
                 <Badge variant="outline" className="hidden md:inline-flex">
