@@ -1,4 +1,4 @@
-import { DETERMINISTIC_CHECKS, type CheckResult, type VerificationResult } from "./types";
+import { DETERMINISTIC_CHECKS, type CheckResult, type VerificationResult } from "./types.ts";
 
 const SECRET_RE =
   /\b(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY)\b/;
@@ -85,15 +85,12 @@ function checkOne(
         ? fail(id, "Dangerous primitive or destructive command in output")
         : pass(id, "No high-risk primitives detected");
     case "formatter": {
-      const mixed = /^\t/m.test(opts.output) && /^  /m.test(opts.output);
-      return mixed
-        ? fail(id, "Mixed tabs and spaces")
-        : pass(id, "Indentation consistent");
+      const mixed = /^\t/m.test(opts.output) && /^ {2}/m.test(opts.output);
+      return mixed ? fail(id, "Mixed tabs and spaces") : pass(id, "Indentation consistent");
     }
     case "linter": {
       const unbalanced =
-        (opts.output.match(/\{/g)?.length ?? 0) -
-          (opts.output.match(/\}/g)?.length ?? 0);
+        (opts.output.match(/\{/g)?.length ?? 0) - (opts.output.match(/\}/g)?.length ?? 0);
       return Math.abs(unbalanced) > 3
         ? fail(id, "Unbalanced braces in generated text")
         : pass(id, "No obvious syntax imbalance");
@@ -120,6 +117,8 @@ export function assembleVerification(opts: {
   patch: string | null;
   output: string;
   critic: string | null;
+  criticAccepted?: boolean;
+  checks?: CheckResult[];
   offensiveRequested: boolean;
   targetAllowlisted: boolean;
   operatorAcceptedLab: boolean;
@@ -127,16 +126,21 @@ export function assembleVerification(opts: {
   const structuredPlan = Boolean(opts.plan && opts.plan.trim().length > 12);
   const patchNotFullOverwrite = !looksLikeFullOverwrite(opts.patch, opts.output);
   const criticReview = Boolean(opts.critic && opts.critic.trim().length > 12);
-  const checks = runDeterministicChecks(opts);
-  const blockedExternalTarget =
-    opts.offensiveRequested && !opts.targetAllowlisted;
+  const criticAccepted = criticReview && opts.criticAccepted === true;
+  const checks = opts.checks ?? runDeterministicChecks(opts);
+  const blockedExternalTarget = opts.offensiveRequested && !opts.targetAllowlisted;
   const checkFails = checks.some((c) => c.status === "fail");
+  const requiredChecksPassed = checks.every((c) => c.status === "pass");
   const notes: string[] = [];
   if (!structuredPlan) notes.push("require_structured_plan — no usable plan");
   if (!patchNotFullOverwrite) {
     notes.push("require_patch_not_full_overwrite — output looks like a full dump");
   }
   if (!criticReview) notes.push("require_critic_review — critic produced no review");
+  else if (!criticAccepted) notes.push("critic rejected the artifact");
+  if (!requiredChecksPassed) {
+    notes.push("required deterministic checks did not all pass");
+  }
   if (blockedExternalTarget) {
     notes.push("prohibit_unapproved_external_targets");
   }
@@ -148,6 +152,8 @@ export function assembleVerification(opts: {
     structuredPlan &&
     patchNotFullOverwrite &&
     criticReview &&
+    criticAccepted &&
+    requiredChecksPassed &&
     !checkFails &&
     !blockedExternalTarget &&
     (!opts.offensiveRequested || opts.operatorAcceptedLab);
@@ -156,6 +162,8 @@ export function assembleVerification(opts: {
     structuredPlan,
     patchNotFullOverwrite,
     criticReview,
+    criticAccepted,
+    requiredChecksPassed,
     checks,
     offensive: {
       environment: "isolated_authorized_lab",

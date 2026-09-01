@@ -1,5 +1,5 @@
-import type { ModelRecord, RoleConfig, RoleId } from "./types";
-import { ROLE_IDS } from "./types";
+import type { ModelRecord, RoleConfig, RoleId } from "./types.ts";
+import { ROLE_IDS } from "./types.ts";
 
 export const PROMPT_TEMPLATE_VERSION = "neuralloom.role.v1";
 
@@ -100,11 +100,7 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
     id: "repo_agent",
     label: "Repo agent",
     primary: "glm-5.3:cloud",
-    fallbacks: [
-      "kimi-k3:cloud",
-      "mistral-large-3:675b-cloud",
-      "qwen3.5:397b-cloud",
-    ],
+    fallbacks: ["kimi-k3:cloud", "mistral-large-3:675b-cloud", "qwen3.5:397b-cloud"],
     think: "max",
     temperature: 0.1,
     responsibilities: [
@@ -167,17 +163,6 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   },
 };
 
-const DIGESTS: Record<string, string> = {
-  "deepseek-v4-pro:0813-cloud": "sha256:7c1a9e2b4d8f3a01",
-  "deepseek-v4-flash:0731-cloud": "sha256:91b0c4e6d2a7f813",
-  "qwen3.5:397b-cloud": "sha256:3e54a8c0b19d67f2",
-  "kimi-k2.7-code:cloud": "sha256:b4d21f90ae68c375",
-  "glm-5.3:cloud": "sha256:0fa7c3e19b2648d1",
-  "kimi-k3:cloud": "sha256:c8e2d05a47b9136f",
-  "mistral-large-3:675b-cloud": "sha256:5d19e7b3c0a84f26",
-  "gemma4:31b-cloud": "sha256:a2f6d81c4e903b57",
-};
-
 export function allConfiguredModels(): string[] {
   const set = new Set<string>();
   for (const id of ROLE_IDS) {
@@ -205,22 +190,26 @@ export function buildInventory(unavailable: string[] = []): ModelRecord[] {
   const usage = modelUsage();
   return allConfiguredModels().map((name) => ({
     name,
-    digest: DIGESTS[name] ?? "sha256:unverified",
+    digest: "unverified",
     available: !unavailable.includes(name),
-    source: "discovered" as const,
+    source: "configured" as const,
     usedBy: usage[name] ?? [],
   }));
 }
 
-export function digestFor(name: string): string {
-  return DIGESTS[name] ?? "sha256:unverified";
+export function digestFor(_name: string): string {
+  return "unverified";
 }
 
 export const ROLE_BLURBS: Record<RoleId, string> = {
-  planner: "Holds the architecture thread. Plans, threat-models, and traces failure across components before anyone writes code.",
+  planner:
+    "Holds the architecture thread. Plans, threat-models, and traces failure across components before anyone writes code.",
   coder: "Weaves patches. Multi-file edits, tests, CLIs, and security tooling at low temperature.",
-  repo_agent: "Maps the mill. Symbols, dependencies, impact, and large refactors with max thinking.",
-  security_specialist: "Tests the cloth. Vulnerability research, exploitability, and lab-only proof work.",
+  repo_agent:
+    "Maps the mill. Symbols, dependencies, impact, and large refactors with max thinking.",
+  security_specialist:
+    "Tests the cloth. Vulnerability research, exploitability, and lab-only proof work.",
   critic: "Independent review. Correctness, security, architecture, hallucination, and test gaps.",
-  fast_triage: "The first pass. Classify, summarize, pick files, and route without burning the heavy models.",
+  fast_triage:
+    "The first pass. Classify, summarize, pick files, and route without burning the heavy models.",
 };

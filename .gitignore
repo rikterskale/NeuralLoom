@@ -2,6 +2,7 @@ node_modules/
 .vercel/
 dist/
 .output/
+.tanstack/
 screenshots/
 artifacts/
 .grok/

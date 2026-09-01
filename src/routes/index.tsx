@@ -27,9 +27,9 @@ function CommandCenter() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        kicker="Fail-closed control plane"
-        title="The mill that refuses first."
-        description="NeuralLoom classifies data, picks a role, and checks execution gates before any cloud model is called. Local-only material never weaves onto Ollama Cloud."
+        kicker="Safe AI assistance"
+        title="Ask once. NeuralLoom handles the safety checks."
+        description="Describe your task in ordinary language. NeuralLoom checks what can be shared, chooses an approved AI model, reviews the response, and keeps a privacy-aware record."
       />
 
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -49,19 +49,16 @@ function CommandCenter() {
         />
         <Stat label="Data policy" value="Default deny" detail="Unknown classes blocked" />
         <Stat
-          label="Execution"
-          value="Sandbox only"
-          detail="Network and secrets denied"
+          label="Generated commands"
+          value="Not executed"
+          detail="A workspace runner must be connected"
         />
       </div>
 
       <section className="mb-10">
         <div className="mb-3 flex items-end justify-between gap-3">
           <h2 className="font-display text-2xl tracking-tight">Role warp</h2>
-          <Link
-            to="/roles"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
+          <Link to="/roles" className="text-sm text-muted-foreground hover:text-foreground">
             View roles
           </Link>
         </div>
@@ -97,8 +94,8 @@ function CommandCenter() {
           })}
         </div>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          {ROLE_BLURBS.planner} Preview execution uses a gated xAI runtime; production
-          routing stays on the local Ollama daemon and the models above.
+          {ROLE_BLURBS.planner} Every environment uses the configured Ollama daemon, and the runtime
+          model must match the discovered model exactly.
         </p>
       </section>
 
@@ -178,15 +175,7 @@ function CommandCenter() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
+function Stat({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="rounded-2xl bg-card px-4 py-4 shadow-[var(--shadow-border)]">
       <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">

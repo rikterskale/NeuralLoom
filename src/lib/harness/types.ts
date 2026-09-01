@@ -52,10 +52,7 @@ export const LOCAL_ONLY = [
 export type CloudPermittedClass = (typeof CLOUD_PERMITTED)[number];
 export type ExplicitAuthClass = (typeof EXPLICIT_AUTH_REQUIRED)[number];
 export type LocalOnlyClass = (typeof LOCAL_ONLY)[number];
-export type KnownDataClass =
-  | CloudPermittedClass
-  | ExplicitAuthClass
-  | LocalOnlyClass;
+export type KnownDataClass = CloudPermittedClass | ExplicitAuthClass | LocalOnlyClass;
 export type DataClass = KnownDataClass | "unknown";
 
 export type DataLane = "cloud_permitted" | "explicit_authorization" | "local_only" | "unknown";
@@ -170,6 +167,8 @@ export type VerificationResult = {
   structuredPlan: boolean;
   patchNotFullOverwrite: boolean;
   criticReview: boolean;
+  criticAccepted: boolean;
+  requiredChecksPassed: boolean;
   checks: CheckResult[];
   offensive: {
     environment: "isolated_authorized_lab";
@@ -231,6 +230,18 @@ export type HarnessRun = {
   authorizationGranted: boolean;
   redactionVerified: boolean;
   operatorAccepted: boolean;
+};
+
+export type ModelDiscovery = {
+  inventory: ModelRecord[];
+  discoveredAt: string;
+  provider: "ollama";
+  endpoint: string;
+  error: string | null;
+};
+
+export type DispatchResult = {
+  run: HarnessRun;
 };
 
 export type DispatchInput = {

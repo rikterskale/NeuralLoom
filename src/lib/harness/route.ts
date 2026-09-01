@@ -1,10 +1,5 @@
-import { ROLE_CATALOG } from "./spec";
-import type {
-  Classification,
-  ModelRecord,
-  RoleId,
-  RouteDecision,
-} from "./types";
+import { ROLE_CATALOG } from "./spec.ts";
+import type { Classification, ModelRecord, RoleId, RouteDecision } from "./types.ts";
 
 const ROLE_HINTS: { role: RoleId; re: RegExp }[] = [
   {
@@ -49,8 +44,7 @@ export function routeRole(opts: {
   failClosedWhenPrimaryMissing: boolean;
   preventUnapprovedSubstitution: boolean;
 }): RouteDecision {
-  const role =
-    opts.requested === "auto" ? autoRole(opts.objective) : opts.requested;
+  const role = opts.requested === "auto" ? autoRole(opts.objective) : opts.requested;
   const config = ROLE_CATALOG[role];
   const available = new Map(opts.inventory.map((m) => [m.name, m]));
 
@@ -95,17 +89,13 @@ export function routeRole(opts: {
   }
 
   const chain = [config.primary, ...config.fallbacks];
-  const startAt =
-    opts.simulatePrimaryFailure || !primary?.available ? 1 : 0;
+  const startAt = opts.simulatePrimaryFailure || !primary?.available ? 1 : 0;
 
   for (let i = startAt; i < chain.length; i++) {
     const name = chain[i];
     const rec = available.get(name);
     if (!rec?.available) continue;
-    if (
-      opts.preventUnapprovedSubstitution &&
-      !chain.includes(name)
-    ) {
+    if (opts.preventUnapprovedSubstitution && !chain.includes(name)) {
       continue;
     }
     return {
@@ -129,9 +119,7 @@ export function routeRole(opts: {
     selectedModel: null,
     candidate: config.primary,
     usedFallback: startAt > 0,
-    fallbackReason: opts.simulatePrimaryFailure
-      ? `Primary ${config.primary} call failed`
-      : null,
+    fallbackReason: opts.simulatePrimaryFailure ? `Primary ${config.primary} call failed` : null,
     denied: true,
     denyReason:
       "No approved model in the role chain is available. Unapproved substitution is forbidden.",

@@ -4,11 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatClass } from "@/lib/harness/labels";
 import { HARNESS_SPEC } from "@/lib/harness/spec";
-import {
-  CONTEXT_EXCLUDE,
-  CONTEXT_INCLUDE,
-  DETERMINISTIC_CHECKS,
-} from "@/lib/harness/types";
+import { CONTEXT_EXCLUDE, CONTEXT_INCLUDE, DETERMINISTIC_CHECKS } from "@/lib/harness/types";
 
 export const Route = createFileRoute("/pipeline")({ component: PipelinePage });
 
@@ -27,7 +23,7 @@ const STAGES = [
   },
   {
     title: "Deterministic checks",
-    body: "Formatter, linter, types, tests, coverage, static security, dependency audit, secret scan, license.",
+    body: "Secret, security, license, and patch checks run now. Checks needing an isolated workspace stay visibly pending until a runner is connected.",
   },
   {
     title: "Offensive validation",
@@ -47,7 +43,7 @@ function PipelinePage() {
       <PageHeader
         kicker="Verification"
         title="Nothing lands unreviewed."
-        description="A weave is only accepted when the plan, patch, critic, and deterministic gates all pass. Offensive work stays in an isolated lab."
+        description="A response is accepted only when its plan, critic verdict, and every required check pass. Missing infrastructure stays pending rather than being counted as success."
       />
 
       <ol className="mb-10 space-y-3">
@@ -61,9 +57,7 @@ function PipelinePage() {
             </span>
             <div>
               <h2 className="font-medium">{stage.title}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                {stage.body}
-              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{stage.body}</p>
             </div>
           </li>
         ))}

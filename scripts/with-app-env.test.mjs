@@ -41,8 +41,8 @@ test("drops non-VITE keys, non-string values and malformed documents", () => {
   assert.deepEqual(parseAppEnv("null"), {});
 });
 
-test("a missing app-env.json is a clean no-op", () => {
-  assert.deepEqual(readAppEnv(makeWorkspace()), {});
+test("a missing app-env.json uses the safe local default", () => {
+  assert.deepEqual(readAppEnv(makeWorkspace()), { VITE_AUTH_ENABLED: "false" });
 });
 
 test("reads the app env from a workspace", () => {
@@ -113,16 +113,23 @@ test("a signal-killed command is never reported as success", async () => {
   );
 });
 
-test("the CLI still runs when invoked through a symlinked path", async () => {
-  // node realpaths import.meta.url but not process.argv[1], so a raw comparison
-  // turns the wrapper into a no-op that exits 0 without starting anything.
-  const link = join(mkdtempSync(join(tmpdir(), "app-env-link-")), "scripts");
-  symlinkSync(join(projectRoot(), "scripts"), link);
-  const { stdout } = await execFileAsync(process.execPath, [
-    join(link, "with-app-env.mjs"),
-    process.execPath,
-    "-e",
-    PRINT_FLAG,
-  ]);
-  assert.equal(stdout, "false");
-});
+test(
+  "the CLI still runs when invoked through a symlinked path",
+  {
+    skip:
+      process.platform === "win32" ? "creating symlinks requires Windows developer mode" : false,
+  },
+  async () => {
+    // node realpaths import.meta.url but not process.argv[1], so a raw comparison
+    // turns the wrapper into a no-op that exits 0 without starting anything.
+    const link = join(mkdtempSync(join(tmpdir(), "app-env-link-")), "scripts");
+    symlinkSync(join(projectRoot(), "scripts"), link);
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(link, "with-app-env.mjs"),
+      process.execPath,
+      "-e",
+      PRINT_FLAG,
+    ]);
+    assert.equal(stdout, "false");
+  },
+);

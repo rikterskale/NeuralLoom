@@ -26,6 +26,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
+export const DEFAULT_APP_ENV = { VITE_AUTH_ENABLED: "false" };
 
 const VITE_PREFIX = "VITE_";
 
@@ -51,12 +52,12 @@ export function parseAppEnv(text) {
   return env;
 }
 
-/** The app env recorded under `root`, or `{}` when the file is absent. */
+/** The app env recorded under `root`, or safe local defaults when absent. */
 export function readAppEnv(root) {
   try {
     return parseAppEnv(readFileSync(join(root, APP_ENV_REL_PATH), "utf8"));
   } catch {
-    return {};
+    return { ...DEFAULT_APP_ENV };
   }
 }
 

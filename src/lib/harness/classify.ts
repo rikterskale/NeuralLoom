@@ -5,7 +5,7 @@ import {
   type Classification,
   type DataLane,
   type KnownDataClass,
-} from "./types";
+} from "./types.ts";
 
 const LOCAL_PATTERNS: { cls: KnownDataClass; re: RegExp; reason: string }[] = [
   {
@@ -108,18 +108,13 @@ export function detectionReasons(text: string): string[] {
   return LOCAL_PATTERNS.filter((rule) => rule.re.test(text)).map((r) => r.reason);
 }
 
-export function classifyPayload(
-  text: string,
-  tagged: KnownDataClass[],
-): Classification {
+export function classifyPayload(text: string, tagged: KnownDataClass[]): Classification {
   const detected = detectSecrets(text);
   const reasons = detectionReasons(text);
   const classes = unique([...tagged, ...detected]);
   const lane = dominantLane(classes.length ? classes : ["unknown"]);
   const suggested = suggestClasses(text, tagged, detected);
-  const redactionRequired = classes.some((c) =>
-    REDACTION_CLASSES.has(c as KnownDataClass),
-  );
+  const redactionRequired = classes.some((c) => REDACTION_CLASSES.has(c as KnownDataClass));
 
   if (classes.length === 0) {
     reasons.push("No data class tagged — default deny, unknown blocked");

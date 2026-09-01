@@ -1,7 +1,7 @@
-import { classifyPayload } from "./classify";
-import { authorizationSatisfied, evaluateExecution, redactionSatisfied } from "./execution";
-import { digestFor, HARNESS_SPEC, PROMPT_TEMPLATE_VERSION, ROLE_CATALOG } from "./spec";
-import { routeRole } from "./route";
+import { classifyPayload } from "./classify.ts";
+import { authorizationSatisfied, evaluateExecution, redactionSatisfied } from "./execution.ts";
+import { digestFor, HARNESS_SPEC, PROMPT_TEMPLATE_VERSION, ROLE_CATALOG } from "./spec.ts";
+import { routeRole } from "./route.ts";
 import type {
   AuditEvent,
   Classification,
@@ -11,7 +11,7 @@ import type {
   ModelRecord,
   RouteDecision,
   RunStatus,
-} from "./types";
+} from "./types.ts";
 
 export type PolicySnapshot = {
   title: string;
@@ -34,10 +34,7 @@ function event(
   return { at: new Date().toISOString(), kind, summary, fields };
 }
 
-export function evaluateDispatch(
-  input: DispatchInput,
-  inventory: ModelRecord[],
-): PolicySnapshot {
+export function evaluateDispatch(input: DispatchInput, inventory: ModelRecord[]): PolicySnapshot {
   const classification = classifyPayload(input.objective, input.taggedClasses);
   const routed = routeRole({
     requested: input.role,
@@ -51,10 +48,7 @@ export function evaluateDispatch(
       HARNESS_SPEC.cloud_primary.model_discovery.prevent_unapproved_model_substitution,
   });
   const execution = evaluateExecution(input, classification);
-  const authOk = authorizationSatisfied(
-    classification,
-    input.authorizationGranted,
-  );
+  const authOk = authorizationSatisfied(classification, input.authorizationGranted);
   const redactOk = redactionSatisfied(classification, input.redactionVerified);
 
   let status: RunStatus = "running";
@@ -65,8 +59,7 @@ export function evaluateDispatch(
     blockReason = "Unknown data class blocked (default deny).";
   } else if (classification.lane === "local_only") {
     status = "blocked";
-    blockReason =
-      "Local-only data cannot leave the operator workstation. Cloud transport refused.";
+    blockReason = "Local-only data cannot leave the operator workstation. Cloud transport refused.";
   } else if (!redactOk) {
     status = "blocked";
     blockReason = "require_redaction_verification — confirm redaction before the call.";
@@ -111,9 +104,7 @@ export function materializeRun(snapshot: PolicySnapshot): HarnessRun {
     }),
     event(
       "route",
-      snapshot.route.denied
-        ? "Routing denied"
-        : `Selected ${snapshot.route.selectedModel}`,
+      snapshot.route.denied ? "Routing denied" : `Selected ${snapshot.route.selectedModel}`,
       {
         role: snapshot.route.role,
         candidate: snapshot.route.candidate,
@@ -129,21 +120,15 @@ export function materializeRun(snapshot: PolicySnapshot): HarnessRun {
     );
   }
   events.push(
-    event(
-      "execution",
-      snapshot.execution.allowed ? "Execution gates clear" : "Execution gated",
-      {
-        sandbox: snapshot.execution.sandboxRequired,
-        network: snapshot.execution.networkAccess,
-      },
-    ),
+    event("execution", snapshot.execution.allowed ? "Execution gates clear" : "Execution gated", {
+      sandbox: snapshot.execution.sandboxRequired,
+      network: snapshot.execution.networkAccess,
+    }),
   );
   events.push(
-    event(
-      "decision",
-      snapshot.status === "running" ? "Clear to call model" : snapshot.status,
-      { promptTemplateVersion: PROMPT_TEMPLATE_VERSION },
-    ),
+    event("decision", snapshot.status === "running" ? "Clear to call model" : snapshot.status, {
+      promptTemplateVersion: PROMPT_TEMPLATE_VERSION,
+    }),
   );
 
   return {
@@ -161,9 +146,7 @@ export function materializeRun(snapshot: PolicySnapshot): HarnessRun {
     intendedModel: snapshot.route.selectedModel,
     runtimeModel: null,
     modelTag: snapshot.route.selectedModel,
-    modelDigest: snapshot.route.selectedModel
-      ? digestFor(snapshot.route.selectedModel)
-      : null,
+    modelDigest: snapshot.route.selectedModel ? digestFor(snapshot.route.selectedModel) : null,
     fallbackReason: snapshot.route.fallbackReason,
     tokenUsage: null,
     plan: null,

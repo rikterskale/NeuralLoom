@@ -1,19 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { ROLE_CATALOG } from "@/lib/harness/spec";
 import { useHarness } from "@/lib/harness/store";
-import { buildInventory } from "@/lib/harness/spec";
 
 export const Route = createFileRoute("/models")({ component: ModelsPage });
 
 function ModelsPage() {
-  const unavailable = useHarness((s) => s.unavailable);
-  const setUnavailable = useHarness((s) => s.setUnavailable);
-  const lastDiscoveryAt = useHarness((s) => s.lastDiscoveryAt);
-  const inventory = useMemo(() => buildInventory(unavailable), [unavailable]);
+  const discovery = useHarness((s) => s.discovery);
+  const inventory = discovery?.inventory ?? [];
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -27,8 +22,7 @@ function ModelsPage() {
         <Badge variant="ok">Provider ollama_cloud</Badge>
         <Badge variant="muted">Transport local_ollama_daemon</Badge>
         <span>
-          Last probe{" "}
-          {lastDiscoveryAt ? new Date(lastDiscoveryAt).toLocaleString() : "pending"}
+          Last probe {discovery ? new Date(discovery.discoveredAt).toLocaleString() : "pending"}
         </span>
       </div>
 
@@ -47,9 +41,7 @@ function ModelsPage() {
             >
               <div className="md:col-span-4">
                 <p className="font-mono text-sm leading-snug">{model.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground md:hidden">
-                  {model.digest}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground md:hidden">{model.digest}</p>
               </div>
               <p className="hidden font-mono text-xs text-muted-foreground md:col-span-3 md:block">
                 {model.digest}
@@ -62,23 +54,19 @@ function ModelsPage() {
                 ))}
               </div>
               <div className="flex items-center justify-between gap-3 md:col-span-2 md:justify-end">
-                <span className="text-sm text-muted-foreground md:hidden">
-                  In inventory
-                </span>
-                <Switch
-                  checked={model.available}
-                  onCheckedChange={(on) => setUnavailable(model.name, on)}
-                  aria-label={`Toggle ${model.name}`}
-                />
+                <span className="text-sm text-muted-foreground md:hidden">Discovered</span>
+                <Badge variant={model.available ? "ok" : "deny"}>
+                  {model.available ? "Available" : "Missing"}
+                </Badge>
               </div>
             </li>
           ))}
         </ul>
       </div>
       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        Toggle a primary off to watch fail-closed routing on Dispatch. Preview
-        generation still executes through a gated xAI runtime; the intended tag and
-        digest stay on the audit record.
+        This is live data from {discovery?.endpoint ?? "the configured Ollama endpoint"}. NeuralLoom
+        sends a task only to the exact model and digest shown here.
+        {discovery?.error ? ` Discovery error: ${discovery.error}` : ""}
       </p>
     </div>
   );

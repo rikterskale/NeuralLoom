@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ROLE_CATALOG } from "@/lib/harness/spec";
 import { relativeTime } from "@/lib/harness/labels";
 import { useHarness } from "@/lib/harness/store";
+import { clearHarnessRuns } from "@/lib/harness/api";
 import type { HarnessRun, RunStatus } from "@/lib/harness/types";
 
 export const Route = createFileRoute("/audit")({ component: AuditPage });
@@ -37,7 +38,7 @@ function AuditPage() {
       <PageHeader
         kicker="Observability"
         title="Every selection is on the record."
-        description="Model tag, digest, prompt template version, fallback reason, token usage, and tool calls are stored. Sensitive fields are redacted."
+        description="Server-verified model identity, decisions, and checks are stored. Private task content is withheld and secret patterns are redacted."
       />
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -53,7 +54,12 @@ function AuditPage() {
             </Button>
           ))}
         </div>
-        <Button variant="ghost" size="sm" onClick={clearRuns} disabled={!runs.length}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void clearHarnessRuns().then(clearRuns)}
+          disabled={!runs.length}
+        >
           Clear log
         </Button>
       </div>
@@ -183,9 +189,7 @@ function RunDetail({ run }: { run: HarnessRun }) {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </p>
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
       <p className="mt-1 font-mono text-xs leading-relaxed break-all">{value}</p>
     </div>
   );

@@ -1,53 +1,33 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { buildInventory } from "./spec";
-import type { HarnessRun, ModelRecord } from "./types";
+import type { HarnessRun, ModelDiscovery } from "./types";
 
 type HarnessState = {
   runs: HarnessRun[];
+  discovery: ModelDiscovery | null;
   unavailable: string[];
   lastDiscoveryAt: string | null;
-  hydrateDiscovery: () => void;
-  setUnavailable: (name: string, available: boolean) => void;
-  inventory: () => ModelRecord[];
+  setRuns: (runs: HarnessRun[]) => void;
+  setDiscovery: (discovery: ModelDiscovery) => void;
   pushRun: (run: HarnessRun) => void;
-  updateRun: (id: string, patch: Partial<HarnessRun>) => void;
   clearRuns: () => void;
 };
 
-export const useHarness = create<HarnessState>()(
-  persist(
-    (set, get) => ({
-      runs: [],
-      unavailable: [],
-      lastDiscoveryAt: null,
-      hydrateDiscovery: () => {
-        if (get().lastDiscoveryAt) return;
-        set({ lastDiscoveryAt: new Date().toISOString() });
-      },
-      setUnavailable: (name, available) => {
-        set((s) => ({
-          unavailable: available
-            ? s.unavailable.filter((n) => n !== name)
-            : [...new Set([...s.unavailable, name])],
-        }));
-      },
-      inventory: () => buildInventory(get().unavailable),
-      pushRun: (run) =>
-        set((s) => ({ runs: [run, ...s.runs].slice(0, 80) })),
-      updateRun: (id, patch) =>
-        set((s) => ({
-          runs: s.runs.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-        })),
-      clearRuns: () => set({ runs: [] }),
+// Presentation cache only. Audit records live server-side; nothing sensitive is
+// written to localStorage or another browser persistence mechanism.
+export const useHarness = create<HarnessState>((set) => ({
+  runs: [],
+  discovery: null,
+  unavailable: [],
+  lastDiscoveryAt: null,
+  setRuns: (runs) => set({ runs }),
+  setDiscovery: (discovery) =>
+    set({
+      discovery,
+      unavailable: discovery.inventory
+        .filter((model) => !model.available)
+        .map((model) => model.name),
+      lastDiscoveryAt: discovery.discoveredAt,
     }),
-    {
-      name: "neuralloom-harness-v1",
-      partialize: (s) => ({
-        runs: s.runs,
-        unavailable: s.unavailable,
-        lastDiscoveryAt: s.lastDiscoveryAt,
-      }),
-    },
-  ),
-);
+  pushRun: (run) => set((state) => ({ runs: [run, ...state.runs].slice(0, 80) })),
+  clearRuns: () => set({ runs: [] }),
+}));

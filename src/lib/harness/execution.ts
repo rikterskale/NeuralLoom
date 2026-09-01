@@ -1,10 +1,10 @@
-import { HARNESS_SPEC } from "./spec";
+import { HARNESS_SPEC } from "./spec.ts";
 import type {
   Classification,
   DispatchInput,
   ExecutionDecision,
   HumanApprovalAction,
-} from "./types";
+} from "./types.ts";
 
 const OFFENSIVE: HumanApprovalAction[] = [
   "exploit_execution",
@@ -16,7 +16,7 @@ const OFFENSIVE: HumanApprovalAction[] = [
 
 export function evaluateExecution(
   input: DispatchInput,
-  classification: Classification,
+  _classification: Classification,
 ): ExecutionDecision {
   const pendingApprovals = input.requestedActions.filter(
     (action) => !input.approvedActions.includes(action),
@@ -40,23 +40,21 @@ export function evaluateExecution(
       controls.private_and_reserved_ranges_denied_unless_allowlisted &&
       !input.targetAllowlisted
     ) {
-      targetControlFailures.push(
-        "private_and_reserved_ranges_denied_unless_allowlisted",
-      );
+      targetControlFailures.push("private_and_reserved_ranges_denied_unless_allowlisted");
     }
   }
 
-  const allowed =
-    pendingApprovals.length === 0 && targetControlFailures.length === 0;
+  const allowed = pendingApprovals.length === 0 && targetControlFailures.length === 0;
 
   return {
     allowed,
     sandboxRequired: HARNESS_SPEC.execution_policy.command_execution.sandbox_required,
-    networkAccess: input.requestedActions.includes("outbound_network_access")
-      && input.approvedActions.includes("outbound_network_access")
-      && input.targetAllowlisted
-      ? "allowlisted"
-      : "deny",
+    networkAccess:
+      input.requestedActions.includes("outbound_network_access") &&
+      input.approvedActions.includes("outbound_network_access") &&
+      input.targetAllowlisted
+        ? "allowlisted"
+        : "deny",
     filesystemAccess: "workspace_only",
     secretsAccess: "deny",
     privilegedExecution: "deny",
@@ -65,18 +63,12 @@ export function evaluateExecution(
   };
 }
 
-export function authorizationSatisfied(
-  classification: Classification,
-  granted: boolean,
-): boolean {
+export function authorizationSatisfied(classification: Classification, granted: boolean): boolean {
   if (classification.lane === "explicit_authorization") return granted;
   return true;
 }
 
-export function redactionSatisfied(
-  classification: Classification,
-  verified: boolean,
-): boolean {
+export function redactionSatisfied(classification: Classification, verified: boolean): boolean {
   if (classification.redactionRequired) return verified;
   return true;
 }
