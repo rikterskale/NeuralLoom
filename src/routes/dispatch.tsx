@@ -453,7 +453,7 @@ function Toggle({
   return (
     <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-secondary px-3">
       <span className="text-sm">{label}</span>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch aria-label={label} checked={checked} onCheckedChange={onChange} />
     </div>
   );
 }

@@ -1,0 +1,52 @@
+name: User readiness
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: user-readiness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  user-readiness:
+    name: Production user readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium for readiness testing
+        run: npx playwright install --with-deps chromium
+
+      - name: Run production user-readiness gate
+        run: npm run readiness:ci
+        env:
+          CI: "true"
+          USER_READINESS_CASE_TIMEOUT_MS: "45000"
+          USER_READINESS_START_TIMEOUT_MS: "90000"
+
+      - name: Upload readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: user-readiness-${{ github.run_id }}
+          path: artifacts/user-readiness/
+          if-no-files-found: warn
+          retention-days: 14
