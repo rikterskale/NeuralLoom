@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { ReadinessAlert } from "@/components/readiness-alert";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROLE_CATALOG } from "@/lib/harness/spec";
 import { useHarness } from "@/lib/harness/store";
 
@@ -10,6 +12,7 @@ export const Route = createFileRoute("/models")({ component: ModelsPage });
 function ModelsPage() {
   const discovery = useHarness((s) => s.discovery);
   const inventory = discovery?.inventory ?? [];
+  const available = inventory.some((model) => model.available);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -23,9 +26,47 @@ function ModelsPage() {
         <ReadinessAlert />
       </div>
 
+      {!available ? (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Finish setup in three steps</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol className="space-y-4 text-sm">
+              <SetupStep number="1" title="Install and open Ollama">
+                Download it from{" "}
+                <a
+                  className="underline underline-offset-4 hover:text-foreground"
+                  href="https://ollama.com/download"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  ollama.com/download
+                </a>
+                . On Linux, start the Ollama service.
+              </SetupStep>
+              <SetupStep number="2" title="Sign in and add a model">
+                <Command>ollama signin</Command>
+                <Command>ollama pull deepseek-v4-flash:0731-cloud</Command>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Approved models run through Ollama Cloud and require an Ollama account and an
+                  internet connection.
+                </p>
+              </SetupStep>
+              <SetupStep number="3" title="Check the connection">
+                <Command>npm run doctor</Command>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Return here and choose <strong className="text-foreground">Check again</strong>.
+                </p>
+              </SetupStep>
+            </ol>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <Badge variant={!discovery ? "muted" : discovery.error ? "deny" : "ok"}>Ollama</Badge>
-        <Badge variant="muted">Local connection</Badge>
+        <Badge variant="muted">Configured connection</Badge>
         <span>
           Last probe {discovery ? new Date(discovery.discoveredAt).toLocaleString() : "pending"}
         </span>
@@ -69,8 +110,9 @@ function ModelsPage() {
         </ul>
         {!inventory.length ? (
           <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-            Model information is still loading. If this persists, run{" "}
-            <code className="font-mono">npm run doctor</code>.
+            {discovery?.error
+              ? "Model information could not be loaded. Follow the setup steps above, then check again."
+              : "Model information is still loading. If this persists, run npm run doctor."}
           </div>
         ) : null}
       </div>
@@ -80,5 +122,35 @@ function ModelsPage() {
         {discovery?.error ? ` Discovery error: ${discovery.error}` : ""}
       </p>
     </div>
+  );
+}
+
+function SetupStep({
+  number,
+  title,
+  children,
+}: {
+  number: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        {number}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="mb-1 font-medium">{title}</p>
+        <div className="leading-relaxed text-muted-foreground">{children}</div>
+      </div>
+    </li>
+  );
+}
+
+function Command({ children }: { children: string }) {
+  return (
+    <code className="mt-2 block overflow-x-auto rounded-lg bg-secondary px-3 py-2 font-mono text-xs text-foreground">
+      {children}
+    </code>
   );
 }

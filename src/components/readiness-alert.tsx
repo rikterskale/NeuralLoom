@@ -56,7 +56,7 @@ export function ReadinessAlert({ compact = false }: { compact?: boolean }) {
           </h2>
           {!compact ? (
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Start Ollama, then make sure at least one approved model is installed. Run
+              Open Ollama, sign in, and add an approved cloud model. Run
               <code className="mx-1 rounded bg-background/60 px-1.5 py-0.5 font-mono text-xs">
                 npm run doctor
               </code>
@@ -76,6 +76,13 @@ export function ReadinessAlert({ compact = false }: { compact?: boolean }) {
             <Button asChild size="sm" variant="ghost">
               <Link to="/models">View setup details</Link>
             </Button>
+            {!compact ? (
+              <Button asChild size="sm" variant="ghost">
+                <a href="https://ollama.com/download" target="_blank" rel="noreferrer">
+                  Download Ollama
+                </a>
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

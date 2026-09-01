@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const root = join(import.meta.dirname, "..");
@@ -31,6 +32,18 @@ export function modelNamesFromSpec(source) {
   return [...new Set(source.match(/[a-z0-9.-]+:[a-z0-9.-]*cloud/g) ?? [])];
 }
 
+export function isLoopbackEndpoint(endpoint) {
+  try {
+    return ["127.0.0.1", "localhost", "::1"].includes(new URL(endpoint).hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function recommendedModel(models) {
+  return models.find((model) => model.includes("flash")) ?? models[0];
+}
+
 function configuredModels() {
   const source = readFileSync(join(root, "src", "lib", "harness", "spec.ts"), "utf8");
   return modelNamesFromSpec(source);
@@ -56,6 +69,10 @@ async function main() {
   const localEnv = readLocalEnv();
   const endpoint =
     process.env.OLLAMA_BASE_URL || localEnv.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+  const localEndpoint = isLoopbackEndpoint(endpoint);
+  const ollamaCli = localEndpoint
+    ? spawnSync("ollama", ["--version"], { encoding: "utf8", timeout: 2_000 })
+    : null;
   let installed = [];
   try {
     const response = await fetch(new URL("/api/tags", endpoint), {
@@ -68,7 +85,15 @@ async function main() {
     pass(`Ollama is reachable at ${new URL(endpoint).origin}`);
   } catch (error) {
     fail(`Ollama is not reachable at ${endpoint}`);
-    note("Install Ollama from https://ollama.com, open it, then run this check again.");
+    if (!localEndpoint) {
+      note("Check the remote URL, network access, and the Ollama service on that host.");
+    } else if (ollamaCli?.error?.code === "ENOENT" || ollamaCli?.status === 127) {
+      note("1. Install Ollama: https://ollama.com/download");
+      note("2. Open the Ollama app, then run: npm run doctor");
+    } else {
+      note("Open the Ollama app, or start it with: ollama serve");
+      note("Then run: npm run doctor");
+    }
     note(`Details: ${error instanceof Error ? error.message : "connection failed"}`);
     healthy = false;
   }
@@ -79,8 +104,11 @@ async function main() {
       pass(`${ready.length} approved model${ready.length === 1 ? " is" : "s are"} available`);
     else {
       fail("Ollama is running, but no approved NeuralLoom model is available");
-      note("Sign in to Ollama if needed, then install a model. For example:");
-      note("ollama pull deepseek-v4-flash:0731-cloud");
+      const model = recommendedModel(configuredModels());
+      note("NeuralLoom uses Ollama Cloud models, which require an Ollama account.");
+      note("1. Sign in or create an account: ollama signin");
+      note(`2. Add the recommended model: ollama pull ${model}`);
+      note("3. Run this check again: npm run doctor");
       healthy = false;
     }
   }

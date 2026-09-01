@@ -2,6 +2,7 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 
 export function AppErrorComponent({ error, reset }: ErrorComponentProps) {
+  const detail = import.meta.env.DEV ? error.message : null;
   return (
     <main
       className={
@@ -14,8 +15,17 @@ export function AppErrorComponent({ error, reset }: ErrorComponentProps) {
       </span>
       <h1 className="text-lg font-semibold">Something went wrong</h1>
       <p className="max-w-md text-sm break-words text-zinc-500 dark:text-zinc-400">
-        {error.message || "An unexpected error occurred. Try reloading the page."}
+        NeuralLoom could not load this page. Try again. If the problem continues during local use,
+        run <code className="font-mono">npm run doctor</code> in the terminal.
       </p>
+      {detail ? (
+        <details className="max-w-lg text-left text-xs text-zinc-500 dark:text-zinc-400">
+          <summary className="cursor-pointer text-center">Technical details</summary>
+          <pre className="mt-2 overflow-auto whitespace-pre-wrap rounded-lg bg-zinc-100 p-3 dark:bg-zinc-900">
+            {detail}
+          </pre>
+        </details>
+      ) : null}
       <button
         type="button"
         onClick={reset}

@@ -57,22 +57,22 @@ function CommandCenter() {
         />
         <Stat
           label="Model status"
-          value={unavailable.length ? `${unavailable.length} down` : "Inventory live"}
+          value={unavailable.length ? `${unavailable.length} unavailable` : "Ready"}
           detail={
             mounted && lastDiscoveryAt ? `Checked ${relativeTime(lastDiscoveryAt)}` : "Checking now"
           }
         />
         <Stat label="Data safety" value="Private by default" detail="Unknown information blocked" />
         <Stat
-          label="Generated commands"
-          value="Not executed"
-          detail="A workspace runner must be connected"
+          label="Commands"
+          value="Display only"
+          detail="NeuralLoom never runs generated commands"
         />
       </div>
 
       <section className="mb-10">
         <div className="mb-3 flex items-end justify-between gap-3">
-          <h2 className="font-display text-2xl tracking-tight">AI specialists</h2>
+          <h2 className="font-display text-2xl tracking-tight">How work is reviewed</h2>
           <Link to="/roles" className="text-sm text-muted-foreground hover:text-foreground">
             View roles
           </Link>
@@ -179,7 +179,7 @@ function CommandCenter() {
             </div>
             <Button asChild className="w-full">
               <Link to="/dispatch">
-                Open dispatch
+                Start a task
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -234,7 +234,7 @@ function EmptyRuns() {
     <div className="rounded-xl bg-secondary px-4 py-8 text-center">
       <p className="font-medium">No tasks yet</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Dispatch a public-repo refactor or watch an unredacted log get refused.
+        Start with public or example material. NeuralLoom will guide you through the safety choices.
       </p>
       <Button asChild className="mt-4">
         <Link to="/dispatch">Start a task</Link>

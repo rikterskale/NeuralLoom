@@ -1,49 +1,99 @@
 # NeuralLoom
 
-NeuralLoom is a safety layer for AI-assisted software work. Describe a task, choose the kind of information involved, and NeuralLoom handles permissions, approved-model selection, independent review, and a privacy-aware audit trail.
+NeuralLoom is a safety layer for AI-assisted software work. You describe a task and identify the information involved; NeuralLoom chooses an approved model, checks permissions, reviews the response, and keeps a privacy-aware audit record.
 
-No AI routing knowledge, account, or external database is required for local use.
+The web app runs locally without a NeuralLoom account or external database. Its approved models currently run through **Ollama Cloud**, so you do need an Ollama account and an internet connection to complete AI tasks. Credentials and other local-only material are refused before any cloud model call.
 
-## Quick start
+New to NeuralLoom? Start with the comprehensive [Getting Started Guide](docs/GETTING_STARTED.md), including supported use cases, a first-task walkthrough, safety guidance, and troubleshooting.
 
-You need [Node.js 22+](https://nodejs.org/) and [Ollama](https://ollama.com/).
+## Quick start (about 5 minutes)
 
-```powershell
+### 1. Install the prerequisites
+
+- [Node.js 22 or newer](https://nodejs.org/)
+- [Ollama](https://ollama.com/download)
+- An [Ollama account](https://ollama.com/) for the approved cloud models
+
+After installing Ollama, open the app. On Linux, start the Ollama service instead.
+
+### 2. Set up NeuralLoom
+
+From this repository folder, run:
+
+```text
 npm run setup
+```
+
+The setup check tells you exactly what is missing. The usual first-time model setup is:
+
+```text
+ollama signin
+ollama pull deepseek-v4-flash:0731-cloud
+npm run doctor
+```
+
+Do not continue until the doctor ends with `Ready. Run: npm run dev`.
+
+### 3. Start the app
+
+```text
 npm run dev
 ```
 
-Open [http://localhost:8080](http://localhost:8080) and select **New task**.
+Open [http://localhost:8080](http://localhost:8080), choose **Start a new task**, and follow the numbered form. Press `Ctrl+C` in the terminal to stop the app.
 
-`npm run setup` installs exact locked dependencies and checks Node, Ollama, and approved model availability. If setup reports that a model is missing, follow its suggested `ollama pull` command and rerun `npm run doctor`.
+> First safe test: ask “Review this example code and suggest a refactoring plan,” then choose **Public or example material**. Do not paste secrets, credentials, or customer data.
 
-### Everyday commands
+## Everyday commands
 
-| Command          | Purpose                                        |
-| ---------------- | ---------------------------------------------- |
-| `npm run dev`    | Start NeuralLoom locally                       |
-| `npm run doctor` | Diagnose setup and model problems              |
-| `npm run check`  | Run type, lint, and test quality gates         |
-| `npm run build`  | Create a production build and apply migrations |
+| Command          | What it does                                   | When to use it               |
+| ---------------- | ---------------------------------------------- | ---------------------------- |
+| `npm run dev`    | Starts NeuralLoom at port 8080                 | Normal local use             |
+| `npm run doctor` | Checks Node, Ollama, and approved models       | Setup or connection problems |
+| `npm run check`  | Runs types, lint, and automated tests          | Before submitting a change   |
+| `npm run build`  | Builds the app and applies database migrations | Production deployment        |
 
-Local use is sign-in free. Audit data uses embedded PGLite and resets when the server process restarts. Configuration defaults are documented in [.env.example](.env.example); copy it to `.env` only when you need to override them.
+You do not need a `.env` file for normal local use. Copy [.env.example](.env.example) to `.env` only when you need to change a documented default.
 
-## How a task is handled
+## What happens to a task
 
-1. The server independently validates the task, information class, permissions, and requested actions.
-2. It selects an approved model and verifies that exact model is available in Ollama.
-3. A separate critic reviews the response.
-4. Deterministic checks run where safely supported. Missing checks remain visible and prevent automatic acceptance.
-5. The decision is recorded before any model call. Restricted content is withheld and recognizable secrets are redacted.
+1. The server checks the information type, requested actions, and permissions.
+2. It selects an approved model and verifies that exact model is available.
+3. A separate AI critic reviews the response.
+4. Built-in safety checks run. Checks that need an isolated workspace remain clearly marked as incomplete.
+5. NeuralLoom records the decision while withholding restricted content and masking recognizable secrets.
 
-Generated commands are never executed by this web application.
+NeuralLoom displays generated commands but never runs them.
 
 ## Troubleshooting
 
-- **“Ollama is not reachable”** — open the Ollama app/service, then select **Check again** or run `npm run doctor`.
-- **“No approved model is available”** — run the `ollama pull ...` command shown by the doctor, then refresh the **Models** page.
-- **Port 8080 is busy** — stop the other process using it; the fixed port is part of the local preview contract.
-- **A task is safely stopped** — open **Audit** for the exact policy reason. Private credentials and unredacted evidence are intentionally local-only.
+### “Ollama is not reachable”
+
+Open the Ollama app, or run `ollama serve` on Linux. Then run `npm run doctor`. If the `ollama` command is unknown, install Ollama and open a new terminal.
+
+### “No approved model is available”
+
+Run:
+
+```text
+ollama signin
+ollama pull deepseek-v4-flash:0731-cloud
+npm run doctor
+```
+
+### Port 8080 is already in use
+
+Stop the other program using port 8080, then run `npm run dev` again. NeuralLoom intentionally uses a fixed local port.
+
+### A task was stopped or needs approval
+
+Open **Audit** in the app and select the task. The event list explains the policy decision. Credentials and unredacted evidence are intentionally local-only and cannot be sent to a cloud model.
+
+If these steps do not help, include your operating system, Node version (`node --version`), and the output of `npm run doctor` in a bug report. Remove tokens, credentials, and private data first.
+
+## Data storage and limitations
+
+Local audit data uses an embedded in-memory PGLite database and resets when the server process restarts. NeuralLoom does not prove generated code is correct and does not include a host execution sandbox. Formatting, type checking, tests, coverage, and dependency auditing that require an isolated workspace stay incomplete rather than being reported as passed.
 
 ## Shared deployment
 
@@ -55,10 +105,8 @@ A shared deployment must set:
 - `OLLAMA_BASE_URL` to the Ollama endpoint
 - `OLLAMA_ALLOW_REMOTE=true` when that endpoint is not loopback
 
-With a real database and authentication disabled, user-scoped server functions fail closed rather than sharing a development identity. Use HTTPS and manage secrets in the deployment platform; never commit `.env`.
+With a real database and authentication disabled, user-scoped server functions fail closed rather than sharing a development identity. Use HTTPS and the deployment platform’s secret manager; never commit `.env`.
 
-## Security boundaries
+## Security reports
 
-NeuralLoom does not prove generated code is correct, provide a host execution sandbox, or authorize work against third-party systems. It reports the controls it actually completed. Formatting, type checking, tests, coverage, and dependency auditing require an isolated workspace runner that is not included yet; those checks stay pending rather than being treated as passes.
-
-To report a vulnerability, use a private security channel for the repository owner rather than a public issue, and include reproduction steps without live credentials or customer data.
+See [SECURITY.md](SECURITY.md) for the private reporting process. Do not open a public issue for a suspected vulnerability.

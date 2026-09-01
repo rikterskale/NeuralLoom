@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { LaneChip, RunStatusChip } from "@/components/status-chip";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,8 @@ function AuditPage() {
   const clearRuns = useHarness((s) => s.clearRuns);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const visible = useMemo(
     () => (filter === "all" ? runs : runs.filter((r) => r.status === filter)),
     [runs, filter],
@@ -57,7 +60,7 @@ function AuditPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => void clearHarnessRuns().then(clearRuns)}
+          onClick={() => setConfirmClear(true)}
           disabled={!runs.length}
         >
           Clear log
@@ -102,6 +105,42 @@ function AuditPage() {
       <Dialog open={Boolean(selected)} onOpenChange={(o) => !o && setOpenId(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           {selected ? <RunDetail run={selected} /> : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear the audit log?</DialogTitle>
+          </DialogHeader>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            This removes every task record from this NeuralLoom session. This action cannot be
+            undone.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmClear(false)} disabled={clearing}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={clearing}
+              onClick={() => {
+                setClearing(true);
+                void clearHarnessRuns()
+                  .then(() => {
+                    clearRuns();
+                    setConfirmClear(false);
+                    toast.success("Audit log cleared.");
+                  })
+                  .catch((cause: unknown) => {
+                    toast.error(cause instanceof Error ? cause.message : "Could not clear the log.");
+                  })
+                  .finally(() => setClearing(false));
+              }}
+            >
+              {clearing ? "Clearing…" : "Clear log"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

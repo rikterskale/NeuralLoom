@@ -102,10 +102,15 @@ function DispatchPage() {
     ].includes(action),
   );
   const objectiveReady = input.objective.trim().length >= 8;
+  const authorizationReady = !explicitAuthorization || input.authorizationGranted;
   const modelsReady = Boolean(
     discovery && !discovery.error && discovery.inventory.some((model) => model.available),
   );
-  const canSubmit = objectiveReady && Boolean(selectedInformation) && (localOnly || modelsReady);
+  const canSubmit =
+    objectiveReady &&
+    Boolean(selectedInformation) &&
+    authorizationReady &&
+    (localOnly || modelsReady);
 
   function patch(value: Partial<DispatchInput>) {
     setInput((current) => ({ ...current, ...value }));
@@ -326,6 +331,8 @@ function DispatchPage() {
                 ? "Describe the task in at least 8 characters."
                 : !selectedInformation
                   ? "Choose the kind of information involved."
+                  : !authorizationReady
+                    ? "Confirm that you are authorized to share this material."
                   : loadError || discovery?.error
                     ? "Start Ollama and check again before submitting."
                     : "An approved model must be available before submitting."}
