@@ -44,9 +44,32 @@ export function recommendedModel(models) {
   return models.find((model) => model.includes("flash")) ?? models[0];
 }
 
+export function rolePrimaryModelsFromSpec(source) {
+  const roles = ["planner", "coder", "repo_agent", "security_specialist", "critic", "fast_triage"];
+  const result = {};
+  for (const role of roles) {
+    const block = source.match(new RegExp(`${role}:\\s*\\{[\\s\\S]*?primary:\\s*"([^"]+)"`));
+    if (block) result[role] = block[1];
+  }
+  return result;
+}
+
+export function usableTaskRoles(primaryModels, installed) {
+  const available = new Set(installed);
+  if (!primaryModels.critic || !available.has(primaryModels.critic)) return [];
+  return Object.entries(primaryModels)
+    .filter(([role, model]) => role !== "critic" && available.has(model))
+    .map(([role]) => role);
+}
+
 function configuredModels() {
   const source = readFileSync(join(root, "src", "lib", "harness", "spec.ts"), "utf8");
   return modelNamesFromSpec(source);
+}
+
+function configuredPrimaryModels() {
+  const source = readFileSync(join(root, "src", "lib", "harness", "spec.ts"), "utf8");
+  return rolePrimaryModelsFromSpec(source);
 }
 
 async function main() {
@@ -74,6 +97,7 @@ async function main() {
     ? spawnSync("ollama", ["--version"], { encoding: "utf8", timeout: 2_000 })
     : null;
   let installed = [];
+  let ollamaReachable = false;
   try {
     const response = await fetch(new URL("/api/tags", endpoint), {
       headers: { accept: "application/json" },
@@ -82,6 +106,7 @@ async function main() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const body = await response.json();
     installed = (body.models ?? []).map((model) => model.name ?? model.model).filter(Boolean);
+    ollamaReachable = true;
     pass(`Ollama is reachable at ${new URL(endpoint).origin}`);
   } catch (error) {
     fail(`Ollama is not reachable at ${endpoint}`);
@@ -98,17 +123,24 @@ async function main() {
     healthy = false;
   }
 
-  if (installed.length) {
-    const ready = configuredModels().filter((model) => installed.includes(model));
-    if (ready.length)
-      pass(`${ready.length} approved model${ready.length === 1 ? " is" : "s are"} available`);
-    else {
-      fail("Ollama is running, but no approved NeuralLoom model is available");
-      const model = recommendedModel(configuredModels());
+  if (ollamaReachable) {
+    const approved = configuredModels().filter((model) => installed.includes(model));
+    const primaries = configuredPrimaryModels();
+    const usableRoles = usableTaskRoles(primaries, installed);
+    if (usableRoles.length) {
+      pass(
+        `${approved.length} approved model${approved.length === 1 ? " is" : "s are"} available; ` +
+          `${usableRoles.length} complete task review path${usableRoles.length === 1 ? " is" : "s are"} ready`,
+      );
+    } else {
+      fail("Ollama is running, but no complete task-and-critic review path is available");
+      const starter = [primaries.coder, primaries.critic].filter(Boolean);
       note("NeuralLoom uses Ollama Cloud models, which require an Ollama account.");
       note("1. Sign in or create an account: ollama signin");
-      note(`2. Add the recommended model: ollama pull ${model}`);
-      note("3. Run this check again: npm run doctor");
+      starter.forEach((model, index) =>
+        note(`${index + 2}. Add a starter model: ollama pull ${model}`),
+      );
+      note(`${starter.length + 2}. Run this check again: npm run doctor`);
       healthy = false;
     }
   }

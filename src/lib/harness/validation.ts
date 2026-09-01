@@ -1,7 +1,7 @@
 import {
   CONTEXT_INCLUDE,
   HUMAN_APPROVAL_ACTIONS,
-  ROLE_IDS,
+  TASK_ROLE_IDS,
   type ContextInclude,
   type DispatchInput,
   type HumanApprovalAction,
@@ -14,7 +14,7 @@ const DATA_CLASSES = new Set<string>([
   ...EXPLICIT_AUTH_REQUIRED,
   ...LOCAL_ONLY,
 ]);
-const ROLES = new Set<string>(["auto", ...ROLE_IDS]);
+const ROLES = new Set<string>(["auto", ...TASK_ROLE_IDS]);
 const ACTIONS = new Set<string>(HUMAN_APPROVAL_ACTIONS);
 const CONTEXTS = new Set<string>(CONTEXT_INCLUDE);
 

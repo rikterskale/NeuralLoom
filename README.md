@@ -28,7 +28,8 @@ The setup check tells you exactly what is missing. The usual first-time model se
 
 ```text
 ollama signin
-ollama pull deepseek-v4-flash:0731-cloud
+ollama pull kimi-k2.7-code:cloud
+ollama pull gemma4:31b-cloud
 npm run doctor
 ```
 
@@ -71,13 +72,14 @@ NeuralLoom displays generated commands but never runs them.
 
 Open the Ollama app, or run `ollama serve` on Linux. Then run `npm run doctor`. If the `ollama` command is unknown, install Ollama and open a new terminal.
 
-### “No approved model is available”
+### “No complete task-and-critic review path is available”
 
 Run:
 
 ```text
 ollama signin
-ollama pull deepseek-v4-flash:0731-cloud
+ollama pull kimi-k2.7-code:cloud
+ollama pull gemma4:31b-cloud
 npm run doctor
 ```
 

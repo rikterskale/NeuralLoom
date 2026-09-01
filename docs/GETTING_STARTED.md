@@ -253,15 +253,16 @@ ollama signin
 
 Follow the prompts to sign in or create an Ollama account. NeuralLoom itself does not receive your Ollama password.
 
-### Step 5: Add the recommended starter model
+### Step 5: Add the recommended starter models
 
 Run:
 
 ```text
-ollama pull deepseek-v4-flash:0731-cloud
+ollama pull kimi-k2.7-code:cloud
+ollama pull gemma4:31b-cloud
 ```
 
-This makes an approved fast-triage model available through your local Ollama service. Other NeuralLoom roles use other approved models. The **Models** page shows which ones are available and which roles use them.
+The first model handles the coding task in this walkthrough. The second is the independent critic required to review its response. A task is ready only when both its role's primary model and the critic primary are available. The **Models** page shows which complete review paths are ready.
 
 ### Step 6: Verify the complete setup
 
@@ -307,7 +308,7 @@ Use public or invented information for the first walkthrough.
 
 On the home page, select **Start a new task**. The **New task** page opens.
 
-If you see **AI models are not ready yet**, open the **Models** page and follow its three setup steps. Do not continue until at least one approved model is available.
+If you see **A complete AI review path is not ready yet**, open the **Models** page and follow its three setup steps. Do not continue until it reports at least one task role ready.
 
 ### 2. Describe the task
 
@@ -668,13 +669,14 @@ Then run:
 npm run doctor
 ```
 
-### No approved model is available
+### No complete task-and-critic review path is available
 
 Run:
 
 ```text
 ollama signin
-ollama pull deepseek-v4-flash:0731-cloud
+ollama pull kimi-k2.7-code:cloud
+ollama pull gemma4:31b-cloud
 npm run doctor
 ```
 
@@ -696,7 +698,7 @@ Read the message directly below the button. Common causes are:
 - no information type is selected;
 - company or client authorization is not confirmed;
 - Ollama is unavailable; or
-- no approved model is installed.
+- the selected task role's primary model or the critic primary model is not installed.
 
 A credentials or live-evidence task can still record a safe refusal without a model.
 
@@ -783,9 +785,9 @@ Local development uses embedded in-memory PGLite. Audit history resets when the 
 
 No, not for normal local use. Create one only to override a documented default.
 
-### Which model should I install first?
+### Which models should I install first?
 
-Install `deepseek-v4-flash:0731-cloud`. It supports fast triage and is an approved fallback for some other roles. The **Models** page shows the complete approved inventory.
+Install `kimi-k2.7-code:cloud` and `gemma4:31b-cloud`. Together they provide the coding role and its required independent critic for the first walkthrough. The **Models** page shows the complete approved inventory and which task roles are ready.
 
 ### How do I update NeuralLoom?
 
