@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ReadinessAlert } from "@/components/readiness-alert";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { ROLE_CATALOG } from "@/lib/harness/spec";
@@ -13,14 +14,18 @@ function ModelsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        kicker="Model discovery"
-        title="Approved inventory only."
-        description="Discovery runs against the local Ollama daemon. If a role's primary is missing, the harness fails closed instead of substituting an unapproved model."
+        kicker="AI setup"
+        title="Model readiness"
+        description="NeuralLoom uses Ollama and only sends work to approved models. This page shows exactly what is ready and what needs attention."
       />
 
+      <div className="mb-6">
+        <ReadinessAlert />
+      </div>
+
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <Badge variant="ok">Provider ollama_cloud</Badge>
-        <Badge variant="muted">Transport local_ollama_daemon</Badge>
+        <Badge variant={!discovery ? "muted" : discovery.error ? "deny" : "ok"}>Ollama</Badge>
+        <Badge variant="muted">Local connection</Badge>
         <span>
           Last probe {discovery ? new Date(discovery.discoveredAt).toLocaleString() : "pending"}
         </span>
@@ -62,6 +67,12 @@ function ModelsPage() {
             </li>
           ))}
         </ul>
+        {!inventory.length ? (
+          <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+            Model information is still loading. If this persists, run{" "}
+            <code className="font-mono">npm run doctor</code>.
+          </div>
+        ) : null}
       </div>
       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">
         This is live data from {discovery?.endpoint ?? "the configured Ollama endpoint"}. NeuralLoom

@@ -3,10 +3,16 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "overrides": {
     "nf3": "0.3.17"
   },
   "scripts": {
+    "setup": "npm ci && npm run doctor",
+    "doctor": "node scripts/doctor.mjs",
+    "start": "npm run dev",
     "dev": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js dev --host 0.0.0.0 --port 8080",
     "build": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
@@ -16,9 +22,10 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test scripts/browser-smoke-verdict.test.mjs scripts/check-auth-invariant.test.mjs scripts/migration-plan.test.mjs scripts/preview.test.mjs scripts/security-boundary.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/harness/harness.test.ts",
+    "test": "node --test scripts/browser-smoke-verdict.test.mjs scripts/check-auth-invariant.test.mjs scripts/doctor.test.mjs scripts/migration-plan.test.mjs scripts/preview.test.mjs scripts/security-boundary.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/harness/harness.test.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

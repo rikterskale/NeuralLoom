@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, CircleCheck, LockKeyhole, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { ReadinessAlert } from "@/components/readiness-alert";
 import { RunStatusChip } from "@/components/status-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ function DispatchPage() {
   const [active, setActive] = useState<HarnessRun | null>(null);
   const pushRun = useHarness((state) => state.pushRun);
   const discovery = useHarness((state) => state.discovery);
+  const loadError = useHarness((state) => state.loadError);
 
   const selectedInformation = input.taggedClasses[0] ?? null;
   const explicitAuthorization = selectedInformation === "internal_company_source_code";
@@ -99,6 +101,11 @@ function DispatchPage() {
       "deployment_to_live_environment",
     ].includes(action),
   );
+  const objectiveReady = input.objective.trim().length >= 8;
+  const modelsReady = Boolean(
+    discovery && !discovery.error && discovery.inventory.some((model) => model.available),
+  );
+  const canSubmit = objectiveReady && Boolean(selectedInformation) && (localOnly || modelsReady);
 
   function patch(value: Partial<DispatchInput>) {
     setInput((current) => ({ ...current, ...value }));
@@ -134,6 +141,7 @@ function DispatchPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-6">
+          <ReadinessAlert compact />
           <Card>
             <CardHeader>
               <CardTitle>1. Describe the task</CardTitle>
@@ -147,8 +155,9 @@ function DispatchPage() {
                   onChange={(event) => patch({ objective: event.target.value })}
                   placeholder="For example: Review this public repository and suggest a safe refactoring plan."
                   className="min-h-32"
+                  aria-describedby="objective-help"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p id="objective-help" className="text-xs text-muted-foreground">
                   Do not paste passwords, tokens, private keys, or live customer evidence.
                 </p>
               </div>
@@ -178,6 +187,7 @@ function DispatchPage() {
                     key={choice.id}
                     type="button"
                     onClick={() => patch({ taggedClasses: [choice.id] })}
+                    aria-pressed={selected}
                     className={cn(
                       "min-h-28 rounded-xl border p-4 text-left transition-colors",
                       selected
@@ -301,7 +311,7 @@ function DispatchPage() {
           <Button
             size="lg"
             className="w-full"
-            disabled={busy || input.objective.trim().length < 8 || !selectedInformation}
+            disabled={busy || !canSubmit}
             onClick={() => void run()}
           >
             {busy
@@ -310,6 +320,17 @@ function DispatchPage() {
                 ? "Record a safe refusal"
                 : "Review this task"}
           </Button>
+          {!busy && !canSubmit ? (
+            <p className="-mt-3 text-center text-xs text-muted-foreground" role="status">
+              {!objectiveReady
+                ? "Describe the task in at least 8 characters."
+                : !selectedInformation
+                  ? "Choose the kind of information involved."
+                  : loadError || discovery?.error
+                    ? "Start Ollama and check again before submitting."
+                    : "An approved model must be available before submitting."}
+            </p>
+          ) : null}
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Lock, ShieldBan, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
+import { ReadinessAlert } from "@/components/readiness-alert";
 import { LaneChip, RunStatusChip } from "@/components/status-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,22 +33,36 @@ function CommandCenter() {
         description="Describe your task in ordinary language. NeuralLoom checks what can be shared, chooses an approved AI model, reviews the response, and keeps a privacy-aware record."
       />
 
+      <div className="-mt-3 mb-6 flex flex-wrap gap-2">
+        <Button asChild size="lg">
+          <Link to="/dispatch">
+            Start a new task
+            <ArrowRight />
+          </Link>
+        </Button>
+        <Button asChild size="lg" variant="ghost">
+          <Link to="/policy">How your data is protected</Link>
+        </Button>
+      </div>
+
+      <div className="mb-6">
+        <ReadinessAlert />
+      </div>
+
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat
-          label="Transport"
-          value="Ollama daemon"
+          label="Connection"
+          value="Ollama"
           detail={HARNESS_SPEC.cloud_primary.endpoint.replace("http://", "")}
         />
         <Stat
-          label="Discovery"
+          label="Model status"
           value={unavailable.length ? `${unavailable.length} down` : "Inventory live"}
           detail={
-            mounted && lastDiscoveryAt
-              ? `Probed ${relativeTime(lastDiscoveryAt)}`
-              : "Checks at startup"
+            mounted && lastDiscoveryAt ? `Checked ${relativeTime(lastDiscoveryAt)}` : "Checking now"
           }
         />
-        <Stat label="Data policy" value="Deny by default" detail="Unknown classes blocked" />
+        <Stat label="Data safety" value="Private by default" detail="Unknown information blocked" />
         <Stat
           label="Generated commands"
           value="Not executed"
@@ -57,7 +72,7 @@ function CommandCenter() {
 
       <section className="mb-10">
         <div className="mb-3 flex items-end justify-between gap-3">
-          <h2 className="font-display text-2xl tracking-tight">Role warp</h2>
+          <h2 className="font-display text-2xl tracking-tight">AI specialists</h2>
           <Link to="/roles" className="text-sm text-muted-foreground hover:text-foreground">
             View roles
           </Link>
@@ -102,7 +117,7 @@ function CommandCenter() {
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Recent weaves</CardTitle>
+            <CardTitle>Recent tasks</CardTitle>
             <Button asChild variant="ghost" size="sm">
               <Link to="/audit">Audit log</Link>
             </Button>
@@ -141,13 +156,13 @@ function CommandCenter() {
           <CardContent className="space-y-4">
             <PostureRow
               icon={ShieldBan}
-              label="Blocked weaves"
+              label="Blocked tasks"
               value={String(blocked)}
               detail="Refused before a model call"
             />
             <PostureRow
               icon={Lock}
-              label="Accepted weaves"
+              label="Accepted tasks"
               value={String(accepted)}
               detail="Plan, patch, critic, and checks"
             />
@@ -217,12 +232,12 @@ function PostureRow({
 function EmptyRuns() {
   return (
     <div className="rounded-xl bg-secondary px-4 py-8 text-center">
-      <p className="font-medium">No weaves yet</p>
+      <p className="font-medium">No tasks yet</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Dispatch a public-repo refactor or watch an unredacted log get refused.
       </p>
       <Button asChild className="mt-4">
-        <Link to="/dispatch">Start a weave</Link>
+        <Link to="/dispatch">Start a task</Link>
       </Button>
     </div>
   );

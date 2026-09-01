@@ -1,42 +1,49 @@
 # NeuralLoom
 
-NeuralLoom is a small safety layer in front of AI coding models. You describe a task, answer one plain-language question about the information involved, and NeuralLoom handles model selection, permission checks, review, and auditing.
+NeuralLoom is a safety layer for AI-assisted software work. Describe a task, choose the kind of information involved, and NeuralLoom handles permissions, approved-model selection, independent review, and a privacy-aware audit trail.
 
-You do not need to understand AI routing or “harnesses” to use it.
+No AI routing knowledge, account, or external database is required for local use.
 
-## Start locally
+## Quick start
 
-Requirements:
-
-- Node.js 22 or newer
-- [Ollama](https://ollama.com/) running on this computer
-- At least the primary model for the role you want to use
+You need [Node.js 22+](https://nodejs.org/) and [Ollama](https://ollama.com/).
 
 ```powershell
-npm ci
+npm run setup
 npm run dev
 ```
 
-Open `http://localhost:8080`, choose **New task**, describe the work, and select the kind of information involved. No sign-in or database setup is required for local use. Local audit data uses the embedded PGLite database and resets when the server process restarts.
+Open [http://localhost:8080](http://localhost:8080) and select **New task**.
 
-The approved model names are listed in `src/lib/harness/spec.ts`. The **Models** page shows which of those models the local Ollama daemon actually discovered.
+`npm run setup` installs exact locked dependencies and checks Node, Ollama, and approved model availability. If setup reports that a model is missing, follow its suggested `ollama pull` command and rerun `npm run doctor`.
 
-## What NeuralLoom enforces
+### Everyday commands
 
-- Every callable harness endpoint verifies the user and blocks scripted cross-site requests.
-- Classification, authorization, model routing, and approvals are repeated on the server immediately before a model call.
-- Credentials, tokens, private keys, and other local-only material stop the request even when the browser supplied a safer label.
-- The selected Ollama model and its discovered digest are recorded. A different runtime model is rejected.
-- Model fallbacks are limited to the role's configured allowlist.
-- A separate critic must return valid JSON and explicitly accept the response. High-severity findings override an `accept: true` value.
-- Skipped checks never count as passes. Generated commands are not executed by this web application.
-- The audit record is written before a model call. Restricted task content is withheld; recognizable secret values are redacted.
+| Command          | Purpose                                        |
+| ---------------- | ---------------------------------------------- |
+| `npm run dev`    | Start NeuralLoom locally                       |
+| `npm run doctor` | Diagnose setup and model problems              |
+| `npm run check`  | Run type, lint, and test quality gates         |
+| `npm run build`  | Create a production build and apply migrations |
 
-## Verification status
+Local use is sign-in free. Audit data uses embedded PGLite and resets when the server process restarts. Configuration defaults are documented in [.env.example](.env.example); copy it to `.env` only when you need to override them.
 
-NeuralLoom can safely run `git apply --check` without changing the workspace, plus content-based secret, security, and license checks. Formatting, type checking, tests, coverage, and dependency auditing require an isolated workspace runner that is not included yet. Those checks appear as **pending**, and the response receives `needs_acceptance` rather than `accepted`.
+## How a task is handled
 
-This is intentional: the application does not execute model-generated code or project configuration on the host while pretending it is sandboxed.
+1. The server independently validates the task, information class, permissions, and requested actions.
+2. It selects an approved model and verifies that exact model is available in Ollama.
+3. A separate critic reviews the response.
+4. Deterministic checks run where safely supported. Missing checks remain visible and prevent automatic acceptance.
+5. The decision is recorded before any model call. Restricted content is withheld and recognizable secrets are redacted.
+
+Generated commands are never executed by this web application.
+
+## Troubleshooting
+
+- **“Ollama is not reachable”** — open the Ollama app/service, then select **Check again** or run `npm run doctor`.
+- **“No approved model is available”** — run the `ollama pull ...` command shown by the doctor, then refresh the **Models** page.
+- **Port 8080 is busy** — stop the other process using it; the fixed port is part of the local preview contract.
+- **A task is safely stopped** — open **Audit** for the exact policy reason. Private credentials and unredacted evidence are intentionally local-only.
 
 ## Shared deployment
 
@@ -46,21 +53,12 @@ A shared deployment must set:
 - `DATABASE_URL` to PostgreSQL
 - the Better Auth/Grok identity variables required by the hosting environment
 - `OLLAMA_BASE_URL` to the Ollama endpoint
-- `OLLAMA_ALLOW_REMOTE=true` if that endpoint is not loopback
+- `OLLAMA_ALLOW_REMOTE=true` when that endpoint is not loopback
 
-With a real database and authentication disabled, user-scoped server functions fail closed instead of sharing the local development identity.
+With a real database and authentication disabled, user-scoped server functions fail closed rather than sharing a development identity. Use HTTPS and manage secrets in the deployment platform; never commit `.env`.
 
-## Quality checks
+## Security boundaries
 
-```powershell
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
+NeuralLoom does not prove generated code is correct, provide a host execution sandbox, or authorize work against third-party systems. It reports the controls it actually completed. Formatting, type checking, tests, coverage, and dependency auditing require an isolated workspace runner that is not included yet; those checks stay pending rather than being treated as passes.
 
-`npm test` is cross-platform and includes policy, redaction, critic, authentication, environment, migration, and server-boundary regression tests. Platform-only branding fixtures from the original scaffold are not part of NeuralLoom's product test gate.
-
-## Important boundaries
-
-NeuralLoom does not prove that generated code is correct, provide a security sandbox, or authorize work against third-party systems. It records and enforces the controls it actually has. Any missing verification remains visible and blocks automatic acceptance.
+To report a vulnerability, use a private security channel for the repository owner rather than a public issue, and include reproduction steps without live credentials or customer data.

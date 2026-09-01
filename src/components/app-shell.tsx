@@ -34,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const setDiscovery = useHarness((s) => s.setDiscovery);
   const setRuns = useHarness((s) => s.setRuns);
+  const setLoadError = useHarness((s) => s.setLoadError);
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
@@ -44,11 +45,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         setDiscovery(discovery);
         setRuns(runs);
       })
-      .catch(() => undefined);
+      .catch((cause: unknown) => {
+        if (!live) return;
+        setLoadError(cause instanceof Error ? cause.message : "NeuralLoom could not start.");
+      });
     return () => {
       live = false;
     };
-  }, [setDiscovery, setRuns]);
+  }, [setDiscovery, setLoadError, setRuns]);
 
   return (
     <div className="weave-bg min-h-dvh">

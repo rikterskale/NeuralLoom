@@ -67,7 +67,7 @@ function AuditPage() {
       {visible.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No audit events in this filter. Dispatch a weave to seed the log.
+            No tasks match this filter yet.
           </CardContent>
         </Card>
       ) : (

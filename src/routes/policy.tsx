@@ -23,7 +23,7 @@ function PolicyPage() {
     <div className="mx-auto max-w-6xl">
       <PageHeader
         kicker="Data and execution"
-        title="Deny is the default weave."
+        title="Safety is the default."
         description="Every payload is classified before a model is selected. Local-only data cannot fall back onto cloud. Commands do not run unless the sandbox, allowlist, and a human agree."
       />
 
@@ -55,8 +55,8 @@ function PolicyPage() {
               <GuardRow key={key} label={key.replaceAll("_", " ")} on={Boolean(on)} />
             ))}
             <p className="pt-2 text-sm text-muted-foreground">
-              Default action: {HARNESS_SPEC.data_policy.default_action}. Unknown
-              classes never ride a fallback.
+              Default action: {HARNESS_SPEC.data_policy.default_action}. Unknown classes never ride
+              a fallback.
             </p>
           </CardContent>
         </Card>

@@ -24,6 +24,10 @@ export const getModelDiscovery = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async (): Promise<ModelDiscovery> => discoverModels());
 
+export const refreshModelDiscovery = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async (): Promise<ModelDiscovery> => discoverModels(true));
+
 export const listHarnessRuns = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<HarnessRun[]> => readRuns(context.userId));
