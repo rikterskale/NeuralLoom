@@ -4,7 +4,7 @@ NeuralLoom is a safety layer for AI-assisted software work. You describe a task 
 
 The web app runs locally without a NeuralLoom account or external database. Models run through **Ollama** by default — installed local models, or the recommended Ollama Cloud models with an Ollama account and an internet connection. You can also connect Claude (Anthropic), ChatGPT (OpenAI), or Grok (xAI) by adding an API key. Credentials and other local-only material are refused before any cloud model call.
 
-New to NeuralLoom? Start with the comprehensive [Getting Started Guide](docs/GETTING_STARTED.md), including supported use cases, a first-task walkthrough, safety guidance, and troubleshooting.
+Completely new to terminals and AI tools? Follow the beginner-friendly [Start Here guide](docs/START_HERE.md) — it assumes nothing and takes about 30 minutes. For the full picture, the comprehensive [Getting Started Guide](docs/GETTING_STARTED.md) covers supported use cases, a first-task walkthrough, safety guidance, and troubleshooting.
 
 ## Quick start (about 5 minutes)
 

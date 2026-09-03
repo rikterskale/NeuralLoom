@@ -2,6 +2,8 @@
 
 This guide takes you from a new checkout to your first reviewed AI task. It assumes you are comfortable opening a terminal, but it does not assume you know Node.js, Ollama, AI model routing, or software security terminology.
 
+> Brand new to terminals or AI tools? Start with the shorter, step-by-step [Start Here guide](START_HERE.md) instead, then come back here when you want the full picture.
+
 ## Contents
 
 1. [What NeuralLoom is](#what-neuralloom-is)
