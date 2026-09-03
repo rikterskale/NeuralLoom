@@ -41,7 +41,7 @@ Ollama is the app that connects NeuralLoom to AI models.
 
 ## Step 3: Download NeuralLoom
 
-1. Go to the NeuralLoom page on GitHub.
+1. Go to [github.com/rikterskale/NeuralLoom](https://github.com/rikterskale/NeuralLoom).
 2. Click the green **Code** button, then click **Download ZIP**.
 3. Find the downloaded ZIP file (usually in your Downloads folder).
 4. Unzip it:
