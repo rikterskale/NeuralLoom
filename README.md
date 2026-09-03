@@ -56,6 +56,8 @@ Open [http://localhost:8080](http://localhost:8080), choose **Start a new task**
 
 You do not need a `.env` file for normal local use. Copy [.env.example](.env.example) to `.env` only when you need to change a documented default.
 
+Optional: add an `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `XAI_API_KEY` to `.env` to make Claude, ChatGPT (OpenAI), or Grok (xAI) models selectable in **Models**. These are cloud services; local-only data is still sent only to local models.
+
 ## What happens to a task
 
 1. The server checks the information type, requested actions, and permissions.

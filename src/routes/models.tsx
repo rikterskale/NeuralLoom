@@ -7,7 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveAndTestModelSettings } from "@/lib/harness/api";
-import { modelLocality, providerModelName } from "@/lib/harness/model-ref";
+import {
+  modelLocality,
+  parseModelRef,
+  PROVIDER_LABELS,
+  providerModelName,
+} from "@/lib/harness/model-ref";
 import {
   defaultModelSettings,
   MODEL_CHOICES,
@@ -15,7 +20,14 @@ import {
   ROLE_CATALOG,
 } from "@/lib/harness/spec";
 import { useHarness } from "@/lib/harness/store";
-import type { ModelSettings, ModelSettingsCheck, RoleId } from "@/lib/harness/types";
+import type {
+  ModelLocality,
+  ModelSettings,
+  ModelSettingsCheck,
+  ProviderId,
+  ProviderStatus,
+  RoleId,
+} from "@/lib/harness/types";
 import { ROLE_IDS } from "@/lib/harness/types";
 
 export const Route = createFileRoute("/models")({ component: ModelsPage });
@@ -51,19 +63,21 @@ function ModelsPage() {
     () =>
       (discovery?.inventory ?? [])
         .filter((model) => model.available)
-        .map((model) =>
-          model.locality === "local"
-            ? {
-                name: model.name,
-                label: "Installed locally",
-                description: "Runs on this computer through Ollama.",
-              }
-            : {
-                name: model.name,
-                label: "Ollama Cloud",
-                description: "Available through your Ollama Cloud account.",
-              },
-        ),
+        .map((model) => {
+          if (model.locality === "local") {
+            return {
+              name: model.name,
+              label: "Installed locally",
+              description: "Runs on this computer through Ollama.",
+            };
+          }
+          const source = model.provider === "ollama" ? "Ollama Cloud" : PROVIDER_LABELS[model.provider];
+          return {
+            name: model.name,
+            label: source,
+            description: `Available through your ${source} account.`,
+          };
+        }),
     [discovery],
   );
   const checkByRole = useMemo(() => new Map(checks.map((check) => [check.role, check])), [checks]);
@@ -155,6 +169,23 @@ function ModelsPage() {
         </div>
       </section>
 
+      {discovery?.providers?.length ? (
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle>AI connections</CardTitle>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Models from every connected service appear in the choices below. Add an API key in
+              your <code className="font-mono text-xs">.env</code> file to connect more services.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-2 sm:grid-cols-2">
+            {discovery.providers.map((provider) => (
+              <ProviderRow key={provider.id} provider={provider} />
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl tracking-tight">Your choices</h2>
@@ -223,9 +254,10 @@ function ModelsPage() {
                     {selected.name}
                   </p>
                   <p className="mt-1 text-xs font-medium text-muted-foreground">
-                    {(record?.locality ?? modelLocality(selected.name)) === "cloud"
-                      ? "Ollama Cloud"
-                      : "Runs locally"}
+                    {modelSourceLabel(
+                      record?.provider ?? parseModelRef(selected.name).provider,
+                      record?.locality ?? modelLocality(selected.name),
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -303,6 +335,35 @@ function SimpleStep({
       </div>
     </div>
   );
+}
+
+const PROVIDER_KEY_HINTS: Partial<Record<ProviderId, string>> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  xai: "XAI_API_KEY",
+};
+
+function ProviderRow({ provider }: { provider: ProviderStatus }) {
+  const keyHint = PROVIDER_KEY_HINTS[provider.id];
+  const state = !provider.configured
+    ? { badge: "muted" as const, text: "Not connected", detail: keyHint ? `Set ${keyHint} to connect.` : "Not configured yet." }
+    : provider.error
+      ? { badge: "warn" as const, text: "Not reachable", detail: provider.error }
+      : { badge: "ok" as const, text: "Connected", detail: provider.endpoint ?? "Ready to use." };
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-xl bg-secondary px-3 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{provider.label}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{state.detail}</p>
+      </div>
+      <Badge variant={state.badge}>{state.text}</Badge>
+    </div>
+  );
+}
+
+function modelSourceLabel(provider: ProviderId, locality: ModelLocality): string {
+  if (locality === "local") return "Runs locally";
+  return provider === "ollama" ? "Ollama Cloud" : PROVIDER_LABELS[provider];
 }
 
 function friendlyRoleName(role: RoleId): string {

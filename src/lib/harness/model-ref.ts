@@ -8,6 +8,13 @@ import type { ModelLocality, ProviderId } from "./types.ts";
 
 export type ModelRef = { provider: ProviderId; model: string };
 
+export const PROVIDER_LABELS: Record<ProviderId, string> = {
+  ollama: "Ollama",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  xai: "xAI",
+};
+
 export function parseModelRef(ref: string): ModelRef {
   const split = ref.indexOf("/");
   if (split > 0) {
@@ -41,5 +48,8 @@ export function ollamaModelLocality(model: string): ModelLocality {
 
 export function modelLocality(ref: string): ModelLocality {
   const parsed = parseModelRef(ref);
-  return ollamaModelLocality(parsed.model);
+  // Every non-Ollama provider is a hosted API: unconditionally cloud, even
+  // when a base-URL override points somewhere local. Treating an unknown
+  // destination as cloud fails closed for local-only data.
+  return parsed.provider === "ollama" ? ollamaModelLocality(parsed.model) : "cloud";
 }

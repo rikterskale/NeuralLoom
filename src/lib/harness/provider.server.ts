@@ -41,6 +41,8 @@ async function discoverProvider(force: boolean, id: ProviderId): Promise<Provide
   const adapter = adapterFor(id);
   const found = new Map<string, FoundModel>();
   let error: string | null = null;
+  // An unconfigured provider is a normal state (no API key), reported through
+  // the configured flag; error is reserved for a configured provider failing.
   if (adapter.configured()) {
     try {
       for (const model of await adapter.listModels()) {
@@ -52,8 +54,6 @@ async function discoverProvider(force: boolean, id: ProviderId): Promise<Provide
     } catch (cause) {
       error = cause instanceof Error ? cause.message : "Model discovery failed";
     }
-  } else {
-    error = `${adapter.label} is not configured`;
   }
 
   const entry: ProviderCacheEntry = {

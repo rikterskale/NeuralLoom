@@ -22,7 +22,7 @@ export type ThinkLevel = "low" | "high" | "max";
 // Provider ids double as the prefix of a qualified model reference
 // ("<provider>/<model>"). Adding a provider means adding an adapter under
 // providers/ and registering its id here.
-export const PROVIDER_IDS = ["ollama"] as const;
+export const PROVIDER_IDS = ["ollama", "anthropic", "openai", "xai"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 // Locality, not provider identity, is what the data-lane guards key off:

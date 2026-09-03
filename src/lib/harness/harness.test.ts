@@ -165,6 +165,24 @@ test("installed local models can be selected and route local-only work locally",
   assert.equal(route.selectedLocality, "local");
 });
 
+test("local-only data never routes to a hosted cloud provider", () => {
+  const hostedModel = "anthropic/claude-sonnet-5";
+  const settings = { ...defaultModelSettings(), coder: hostedModel };
+  const catalog = catalogForModelSettings(settings);
+  const route = routeRole({
+    requested: "coder",
+    objective: "Review this repo",
+    classification: classifyPayload("Review this repo; password=hunter2", []),
+    inventory: buildInventory([], catalog),
+    simulatePrimaryFailure: false,
+    failClosedWhenPrimaryMissing: true,
+    preventUnapprovedSubstitution: true,
+    catalog,
+  });
+  assert.equal(route.selectedModel, null);
+  assert.equal(route.denied, true);
+});
+
 test("local-only work is blocked when the critic is Cloud", () => {
   const settings = { ...defaultModelSettings(), coder: "ollama/llama3.1:8b" };
   const catalog = catalogForModelSettings(settings);
