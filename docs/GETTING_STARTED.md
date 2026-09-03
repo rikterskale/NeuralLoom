@@ -122,17 +122,40 @@ NeuralLoom currently does **not**:
 
 - automatically open, index, or modify the repository on your computer;
 - automatically fetch a repository from a URL mentioned in a task;
-- apply a generated patch;
-- run generated shell commands;
+- apply a generated patch to your working tree (a patch is applied only inside a disposable sandbox snapshot when the optional workspace runner is enabled — see below — never to the repository you work in);
+- run generated shell commands (the sandbox runs only the check commands _you_ configure, never commands produced by a model);
 - deploy software, merge pull requests, or publish releases;
-- provide a host execution sandbox;
-- run workspace-dependent formatting, linting, type checking, tests, coverage, or dependency auditing;
+- provide an operating-system or network jail (the optional runner isolates by disposable file copy, a secret-scrubbed environment, and time limits, not by kernel-level confinement);
+- run workspace-dependent formatting, linting, type checking, tests, coverage, or dependency auditing unless you enable and configure the optional workspace runner below;
 - guarantee that AI-generated code is correct or secure;
 - replace code review, testing, change management, or professional security judgment;
 - make restricted information safe merely because you selected a less-sensitive label; or
 - authorize work against a third-party system.
 
 Checks that require an isolated workspace runner remain visibly incomplete. NeuralLoom does not count a missing check as a pass.
+
+### Optional: the isolated workspace runner
+
+By default the workspace-dependent checks (formatter, linter, type checker, unit and integration tests, coverage, dependency audit) report as **skip** — never as a pass — because no runner is attached. You can attach one deliberately. When enabled, NeuralLoom:
+
+1. copies a workspace you designate into a fresh temporary directory, so your real working tree is never opened or modified;
+2. applies the model's proposed patch **inside that copy only**;
+3. runs the exact check commands you configured, each with a timeout and captured output; and
+4. builds the child environment from a short allowlist, withholding API keys, tokens, `DATABASE_URL`, the Ollama endpoint, and anything whose value looks like a secret — so a generated patch cannot read or send your credentials.
+
+A check with no configured command stays `skip`. A patch that fails to apply, a command that exits non-zero, or a command that times out is a `fail`. Acceptance still requires every required check to pass, so an unattached or partly-configured runner can never turn a run green on its own.
+
+Enable it with environment variables (see [.env.example](../.env.example)):
+
+```text
+NEURALLOOM_SANDBOX_ENABLED=true
+NEURALLOOM_SANDBOX_WORKSPACE=/absolute/path/to/a/prepared/workspace
+NEURALLOOM_SANDBOX_CMD_LINTER=npm run lint
+NEURALLOOM_SANDBOX_CMD_TYPE_CHECKER=npm run typecheck
+NEURALLOOM_SANDBOX_CMD_UNIT_TESTS=npm test
+```
+
+Because the snapshot excludes `node_modules` and `.git` by default, point `NEURALLOOM_SANDBOX_WORKSPACE` at a workspace whose dependencies are already installed, or make a command install them (for example `npm ci && npm test`). Adjust the copy exclusions with `NEURALLOOM_SANDBOX_COPY_IGNORE`.
 
 ## How NeuralLoom protects your work
 

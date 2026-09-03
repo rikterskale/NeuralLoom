@@ -1,8 +1,15 @@
 import { spawn } from "node:child_process";
 import { DETERMINISTIC_CHECKS, type CheckResult } from "./types";
 import { runDeterministicChecks } from "./verify";
+import { loadSandboxConfig, runSandboxChecks, type SandboxCheck } from "./sandbox.server";
 
 const CHECK_TIMEOUT_MS = 10_000;
+
+const CONTENT_CHECKS = new Set<CheckResult["id"]>([
+  "secret_scan",
+  "static_security_analysis",
+  "license_check",
+]);
 
 export async function verifyArtifact(opts: {
   output: string;
@@ -11,13 +18,23 @@ export async function verifyArtifact(opts: {
 }): Promise<CheckResult[]> {
   const contentChecks = runDeterministicChecks(opts);
   const byId = new Map(contentChecks.map((check) => [check.id, check]));
-  const results: CheckResult[] = [];
 
+  const config = loadSandboxConfig();
+  const sandbox = await runSandboxChecks({ patch: opts.patch }, config);
+
+  const results: CheckResult[] = [];
   for (const id of DETERMINISTIC_CHECKS) {
-    if (["secret_scan", "static_security_analysis", "license_check"].includes(id)) {
+    if (CONTENT_CHECKS.has(id)) {
       results.push(byId.get(id) as CheckResult);
       continue;
     }
+    const fromSandbox = sandbox?.get(id as SandboxCheck);
+    if (fromSandbox) {
+      results.push(fromSandbox);
+      continue;
+    }
+    // Sandbox disabled: keep the lightweight, working-tree-safe patch check for
+    // integration_tests and leave every other workspace check honestly skipped.
     if (id === "integration_tests") {
       results.push(await patchApplies(opts.patch));
       continue;
@@ -26,6 +43,7 @@ export async function verifyArtifact(opts: {
       id,
       status: "skip",
       detail:
+        config.disabledReason ??
         "No isolated workspace runner is connected. This check is required before acceptance.",
     });
   }

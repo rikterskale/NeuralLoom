@@ -95,7 +95,7 @@ If these steps do not help, include your operating system, Node version (`node -
 
 ## Data storage and limitations
 
-Local audit data uses an embedded in-memory PGLite database and resets when the server process restarts. NeuralLoom does not prove generated code is correct and does not include a host execution sandbox. Formatting, type checking, tests, coverage, and dependency auditing that require an isolated workspace stay incomplete rather than being reported as passed.
+Local audit data uses an embedded in-memory PGLite database and resets when the server process restarts. NeuralLoom does not prove generated code is correct. Formatting, type checking, tests, coverage, and dependency auditing that require an isolated workspace stay incomplete rather than being reported as passed, unless you enable the optional workspace runner. That runner snapshots a workspace you designate into a disposable copy, applies the model's patch there only (never to your working tree), and runs the check commands you configure with a secret-scrubbed environment; it isolates by file copy, environment scrubbing, and timeouts, not by kernel-level confinement. See the [Getting Started Guide](docs/GETTING_STARTED.md) and [.env.example](.env.example) for setup.
 
 ## Shared deployment
 
