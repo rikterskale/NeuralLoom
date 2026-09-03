@@ -6,6 +6,7 @@ import { parseCriticVerdict } from "./critic";
 import { evaluateDispatch, materializeRun } from "./engine";
 import { readModelSettings, writeModelSettings } from "./model-settings.server";
 import { criticSystemPrompt, roleSystemPrompt } from "./prompts";
+import { parseModelRef } from "./model-ref";
 import { completeModel, discoverModels, type ModelCompletion } from "./provider.server";
 import { catalogForModelSettings, parseModelSettings, ROLE_CATALOG } from "./spec";
 import type {
@@ -61,11 +62,7 @@ export const saveAndTestModelSettings = createServerFn({ method: "POST" })
         model: settings[role],
         compatible: true,
         available: available.has(settings[role]),
-        message: available.has(settings[role])
-          ? "Ready to use"
-          : discovery.error
-            ? "NeuralLoom cannot reach Ollama yet"
-            : "This model still needs to be added in Ollama",
+        message: settingsCheckMessage(settings[role], available.has(settings[role]), discovery),
       })),
     };
   });
@@ -205,6 +202,18 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
     await saveRun(context.userId, run);
     return { run };
   });
+
+function settingsCheckMessage(ref: string, available: boolean, discovery: ModelDiscovery): string {
+  if (available) return "Ready to use";
+  const provider = parseModelRef(ref).provider;
+  const status = discovery.providers.find((entry) => entry.id === provider);
+  const label = status?.label ?? provider;
+  if (status && !status.configured) return `${label} is not connected. Add its API key in .env.`;
+  if (status?.error) return `NeuralLoom cannot reach ${label} yet`;
+  return provider === "ollama"
+    ? "This model still needs to be added in Ollama"
+    : `${label} does not currently offer this model`;
+}
 
 type CompletionRoute = {
   completion: ModelCompletion;

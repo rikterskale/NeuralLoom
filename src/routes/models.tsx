@@ -211,9 +211,14 @@ function ModelsPage() {
             description: "This model is no longer in the current Ollama inventory.",
           };
           const record = discovery?.inventory.find((model) => model.name === selections[role]);
+          const provider = record?.provider ?? parseModelRef(selections[role]).provider;
+          const providerStatus = discovery?.providers.find((entry) => entry.id === provider);
+          const providerUnready = Boolean(
+            providerStatus && (!providerStatus.configured || providerStatus.error),
+          );
           const latestCheck = checkByRole.get(role);
           const available = latestCheck?.available ?? record?.available ?? false;
-          const status = latestCheck?.message ?? readinessMessage(discovery?.error, available);
+          const status = latestCheck?.message ?? readinessMessage(providerStatus, available);
 
           return (
             <Card key={role}>
@@ -225,8 +230,8 @@ function ModelsPage() {
                       {ROLE_HELP[role]}
                     </p>
                   </div>
-                  <Badge variant={available ? "ok" : discovery?.error ? "warn" : "muted"}>
-                    {available ? "Ready" : discovery?.error ? "Not checked" : "Needs setup"}
+                  <Badge variant={available ? "ok" : providerUnready ? "warn" : "muted"}>
+                    {available ? "Ready" : providerUnready ? "Not checked" : "Needs setup"}
                   </Badge>
                 </div>
               </CardHeader>
@@ -378,8 +383,20 @@ function plainModelName(name: string): string {
   return providerModelName(name).replace(":cloud", "").replaceAll("-", " ");
 }
 
-function readinessMessage(error: string | null | undefined, available: boolean): string {
-  if (available) return "Compatible and available in Ollama";
-  if (error) return "Open Ollama, then save and test again";
+function readinessMessage(provider: ProviderStatus | undefined, available: boolean): string {
+  if (available) {
+    return `Compatible and available through ${provider?.label ?? "the configured service"}`;
+  }
+  if (provider && !provider.configured) {
+    return `Connect ${provider.label} by adding its API key in .env`;
+  }
+  if (provider?.error) {
+    return provider.id === "ollama"
+      ? "Open Ollama, then save and test again"
+      : `${provider.label} is not reachable; save and test again`;
+  }
+  if (provider && provider.id !== "ollama") {
+    return `${provider.label} does not currently offer this model`;
+  }
   return "Compatible, but this model still needs to be added in Ollama";
 }

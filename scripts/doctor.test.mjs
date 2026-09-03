@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  configuredHostedProviders,
   isLoopbackEndpoint,
   hasLocalReviewPath,
   modelNamesFromSpec,
@@ -59,4 +60,13 @@ test("doctor requires both a task primary and the critic primary", () => {
 test("doctor recognizes an installed local review path", () => {
   assert.equal(hasLocalReviewPath(["llama3.1:8b"]), true);
   assert.equal(hasLocalReviewPath(["gemma4:31b-cloud"]), false);
+});
+
+test("doctor reports hosted providers only when a key is actually set", () => {
+  assert.deepEqual(configuredHostedProviders({}), []);
+  assert.deepEqual(configuredHostedProviders({ ANTHROPIC_API_KEY: "  " }), []);
+  assert.deepEqual(
+    configuredHostedProviders({ ANTHROPIC_API_KEY: "k", XAI_API_KEY: "k", OTHER: "x" }),
+    ["Anthropic (Claude)", "xAI (Grok)"],
+  );
 });

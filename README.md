@@ -2,7 +2,7 @@
 
 NeuralLoom is a safety layer for AI-assisted software work. You describe a task and identify the information involved; NeuralLoom chooses an approved model, checks permissions, reviews the response, and keeps a privacy-aware audit record.
 
-The web app runs locally without a NeuralLoom account or external database. Its approved models currently run through **Ollama Cloud**, so you do need an Ollama account and an internet connection to complete AI tasks. Credentials and other local-only material are refused before any cloud model call.
+The web app runs locally without a NeuralLoom account or external database. Models run through **Ollama** by default — installed local models, or the recommended Ollama Cloud models with an Ollama account and an internet connection. You can also connect Claude (Anthropic), ChatGPT (OpenAI), or Grok (xAI) by adding an API key. Credentials and other local-only material are refused before any cloud model call.
 
 New to NeuralLoom? Start with the comprehensive [Getting Started Guide](docs/GETTING_STARTED.md), including supported use cases, a first-task walkthrough, safety guidance, and troubleshooting.
 

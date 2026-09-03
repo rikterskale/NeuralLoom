@@ -35,7 +35,7 @@ NeuralLoom is a local web application that adds safety checks around AI-assisted
 7. runs the safety checks that are available; and
 8. records the decision in a privacy-aware audit log.
 
-You use NeuralLoom in a browser, but the application server and Ollama connection run from your computer by default. The approved models in the current configuration are Ollama Cloud models. Completing an AI task therefore requires an Ollama account and an internet connection.
+You use NeuralLoom in a browser, but the application server and Ollama connection run from your computer by default. The recommended configuration uses Ollama Cloud models, which require an Ollama account and an internet connection; installed local Ollama models also work. You can additionally connect hosted services — Claude (Anthropic), ChatGPT (OpenAI), or Grok (xAI) — by adding an API key (see [Configuration](#configuration)). Every hosted model counts as cloud for routing, so local-only material never reaches one.
 
 NeuralLoom is designed to fail closed. If it cannot confidently classify the information, verify an approved model, or satisfy a required permission, it stops the task instead of quietly bypassing the control.
 
@@ -555,7 +555,7 @@ Explains the plan, patch, critic, deterministic-check, and authorized-lab stages
 
 ### Models
 
-Shows live Ollama availability, approved models, model identity information, and the roles that use each model. When setup is incomplete, this page provides a three-step recovery guide.
+Shows live model availability, approved models, model identity information, and the roles that use each model. The **AI connections** card lists each configured service (Ollama plus any hosted provider with an API key), and every discovered model — local or cloud — can be chosen for a role. When setup is incomplete, this page provides a three-step recovery guide.
 
 ### Audit
 
@@ -643,11 +643,22 @@ Available settings include:
 
 - `OLLAMA_BASE_URL`: the Ollama API endpoint; defaults to `http://127.0.0.1:11434`.
 - `OLLAMA_ALLOW_REMOTE`: must be `true` only when you intentionally use a non-loopback Ollama endpoint.
+- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY`: optional keys that connect Claude, ChatGPT, or Grok models (see below).
 - `VITE_AUTH_ENABLED`: remains `false` for normal single-user local use; shared deployments must enable authentication.
 - `DATABASE_URL`: optional for local use; required for the supported PostgreSQL shared-deployment path.
 - `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET`: deployment authentication settings, not normal local setup values.
 
 Do not place a credential in `.env.example`, source code, documentation, screenshots, or bug reports.
+
+### Optional: connect Claude, ChatGPT, or Grok
+
+NeuralLoom can use hosted models from Anthropic (Claude), OpenAI (ChatGPT), and xAI (Grok) alongside Ollama. To connect one:
+
+1. Copy `.env.example` to `.env` if you have not already.
+2. Add the service's API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `XAI_API_KEY`.
+3. Restart NeuralLoom, open **Models**, and use **Save choices and test**. The service appears in the AI connections card and its models become selectable for each role.
+
+Keys are read by the local server only and are never sent to the browser. Every hosted model is treated as a cloud destination: local-only material such as credentials is refused before any call to it, exactly as with Ollama Cloud. `OPENAI_BASE_URL` may point to any OpenAI-compatible server; a non-loopback override must use `https`.
 
 ### Shared deployments
 
@@ -766,7 +777,7 @@ Remove credentials, private source, customer information, internal URLs, and liv
 
 ### Does NeuralLoom run entirely offline?
 
-No. The application server and Ollama transport run locally by default, but the currently approved models are Ollama Cloud models. AI tasks require an Ollama account and internet access.
+It can. When installed local Ollama models are selected for your roles, including the independent critic, tasks run without internet access. The recommended Ollama Cloud models and any connected hosted service (Anthropic, OpenAI, xAI) require an internet connection.
 
 ### Does NeuralLoom upload my whole repository?
 

@@ -71,6 +71,16 @@ export function hasLocalReviewPath(installed) {
   return localModels.length > 0;
 }
 
+export const HOSTED_PROVIDERS = [
+  ["Anthropic (Claude)", "ANTHROPIC_API_KEY"],
+  ["OpenAI (ChatGPT)", "OPENAI_API_KEY"],
+  ["xAI (Grok)", "XAI_API_KEY"],
+];
+
+export function configuredHostedProviders(env) {
+  return HOSTED_PROVIDERS.filter(([, name]) => (env[name] ?? "").trim()).map(([label]) => label);
+}
+
 function configuredModels() {
   const source = readFileSync(join(root, "src", "lib", "harness", "spec.ts"), "utf8");
   return modelNamesFromSpec(source);
@@ -155,6 +165,12 @@ async function main() {
       note(`${starter.length + 2}. Run this check again: npm run doctor`);
       healthy = false;
     }
+  }
+
+  const hosted = configuredHostedProviders({ ...localEnv, ...process.env });
+  if (hosted.length) {
+    pass(`Optional AI services with an API key: ${hosted.join(", ")}`);
+    note("Their models appear in the Models page after the app starts.");
   }
 
   console.log(
