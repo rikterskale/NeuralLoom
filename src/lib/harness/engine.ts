@@ -40,8 +40,9 @@ export function evaluateDispatch(
   input: DispatchInput,
   inventory: ModelRecord[],
   catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG,
+  classificationText: string = input.objective,
 ): PolicySnapshot {
-  const classification = classifyPayload(input.objective, input.taggedClasses);
+  const classification = classifyPayload(classificationText, input.taggedClasses);
   const routed = routeRole({
     requested: input.role,
     objective: input.objective,
@@ -165,6 +166,9 @@ export function materializeRun(snapshot: PolicySnapshot): HarnessRun {
     patch: null,
     output: null,
     critic: null,
+    commands: [],
+    repository: null,
+    approvedActions: [],
     events,
     authorizationGranted: snapshot.authorizationGranted,
     redactionVerified: snapshot.redactionVerified,

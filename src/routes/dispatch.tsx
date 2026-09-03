@@ -13,7 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { dispatchHarnessRun } from "@/lib/harness/api";
+import {
+  applyHarnessPatch,
+  dispatchHarnessRun,
+  performHarnessRemoteAction,
+  runHarnessCommands,
+} from "@/lib/harness/api";
 import { ACTION_LABELS, formatClass } from "@/lib/harness/labels";
 import { autoRole } from "@/lib/harness/route";
 import { roleReadiness, ROLE_CATALOG } from "@/lib/harness/spec";
@@ -42,6 +47,7 @@ const EMPTY: DispatchInput = {
   requestedActions: [],
   approvedActions: [],
   contextIncludes: ["relevant_source_files", "relevant_tests"],
+  repository: { kind: "none", location: "" },
   targetAllowlisted: false,
   authorizationRecord: false,
   simulatePrimaryFailure: false,
@@ -91,17 +97,23 @@ function DispatchPage() {
   const selectedInformation = input.taggedClasses[0] ?? null;
   const explicitAuthorization = selectedInformation === "internal_company_source_code";
   const localOnly = selectedInformation === "secrets_and_api_keys";
-  const needsTarget = input.requestedActions.some((action) =>
-    [
-      "outbound_network_access",
-      "exploit_execution",
-      "credential_operations",
-      "authentication_testing",
-      "persistence_testing",
-      "lateral_movement_testing",
-      "deployment_to_live_environment",
-    ].includes(action),
-  );
+  const needsTarget =
+    input.repository.kind === "url" ||
+    input.requestedActions.some((action) =>
+      [
+        "outbound_network_access",
+        "exploit_execution",
+        "credential_operations",
+        "authentication_testing",
+        "persistence_testing",
+        "lateral_movement_testing",
+        "deployment_to_live_environment",
+        "pull_request_merge",
+        "release_publication",
+        "generated_command_execution",
+        "working_tree_patch",
+      ].includes(action),
+    );
   const objectiveReady = input.objective.trim().length >= 8;
   const authorizationReady = !explicitAuthorization || input.authorizationGranted;
   const resolvedRole = input.role === "auto" ? autoRole(input.objective) : input.role;
@@ -111,14 +123,60 @@ function DispatchPage() {
   const modelsReady = Boolean(
     discovery && !discovery.error && modelReadiness.roleReady && modelReadiness.criticReady,
   );
+  const repositoryReady =
+    input.repository.kind === "none" || Boolean(input.repository.location.trim());
+  const urlNetworkReady =
+    input.repository.kind !== "url" ||
+    (input.requestedActions.includes("outbound_network_access") &&
+      input.approvedActions.includes("outbound_network_access") &&
+      input.targetAllowlisted &&
+      input.authorizationRecord);
+  const repositoryActions = input.requestedActions.filter((action) =>
+    [
+      "generated_command_execution",
+      "working_tree_patch",
+      "deployment_to_live_environment",
+      "pull_request_merge",
+      "release_publication",
+    ].includes(action),
+  );
+  const automationRepositoryReady =
+    repositoryActions.length === 0 ||
+    (input.repository.kind !== "none" &&
+      (!repositoryActions.includes("working_tree_patch") || input.repository.kind === "local") &&
+      (!repositoryActions.some((action) =>
+        ["pull_request_merge", "release_publication"].includes(action),
+      ) ||
+        input.repository.kind === "url"));
   const canSubmit =
     objectiveReady &&
     Boolean(selectedInformation) &&
     authorizationReady &&
+    repositoryReady &&
+    urlNetworkReady &&
+    automationRepositoryReady &&
     (localOnly || modelsReady);
 
   function patch(value: Partial<DispatchInput>) {
     setInput((current) => ({ ...current, ...value }));
+  }
+
+  function selectRepository(kind: DispatchInput["repository"]["kind"]) {
+    setInput((current) => {
+      const requestedActions =
+        kind === "url"
+          ? [...new Set([...current.requestedActions, "outbound_network_access" as const])]
+          : current.requestedActions;
+      return {
+        ...current,
+        repository: { kind, location: "" },
+        requestedActions,
+        approvedActions:
+          kind === "url"
+            ? current.approvedActions.filter((action) => action !== "outbound_network_access")
+            : current.approvedActions,
+      };
+    });
   }
 
   async function run() {
@@ -169,6 +227,37 @@ function DispatchPage() {
                 />
                 <p id="objective-help" className="text-xs text-muted-foreground">
                   Do not paste passwords, tokens, private keys, or live customer evidence.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Repository source</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["none", "local", "url"] as const).map((kind) => (
+                    <Choice
+                      key={kind}
+                      active={input.repository.kind === kind}
+                      onClick={() => selectRepository(kind)}
+                    >
+                      {kind === "none" ? "No repository" : kind === "local" ? "Local folder" : "Public HTTPS URL"}
+                    </Choice>
+                  ))}
+                </div>
+                {input.repository.kind !== "none" ? (
+                  <Input
+                    aria-label={input.repository.kind === "local" ? "Absolute repository path" : "Public repository URL"}
+                    value={input.repository.location}
+                    onChange={(event) =>
+                      patch({ repository: { ...input.repository, location: event.target.value } })
+                    }
+                    placeholder={
+                      input.repository.kind === "local"
+                        ? "C:\\absolute\\path\\to\\repository"
+                        : "https://github.com/owner/repository"
+                    }
+                  />
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  Local folders must be under a configured repository root. URLs are cloned into a disposable directory.
                 </p>
               </div>
               <div className="space-y-2">
@@ -259,7 +348,7 @@ function DispatchPage() {
                 </div>
               </div>
               <div>
-                <Label>Actions the answer may discuss</Label>
+                <Label>Actions to permit after independent review</Label>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {HUMAN_APPROVAL_ACTIONS.map((action) => (
                     <ActionOption
@@ -338,6 +427,12 @@ function DispatchPage() {
                   ? "Choose the kind of information involved."
                   : !authorizationReady
                     ? "Confirm that you are authorized to share this material."
+                    : !repositoryReady
+                      ? "Provide the repository path or URL."
+                      : !urlNetworkReady
+                        ? "Approve outbound access and confirm the target controls in Advanced options."
+                        : !automationRepositoryReady
+                          ? "Select a compatible repository source for the requested automation."
                     : loadError || discovery?.error
                       ? "Start Ollama and check again before submitting."
                       : !modelReadiness.roleReady
@@ -370,14 +465,79 @@ function DispatchPage() {
               </div>
             </CardContent>
           </Card>
-          {active ? <RunResult run={active} /> : null}
+          {active ? (
+            <RunResult
+              run={active}
+              onUpdate={(run) => {
+                setActive(run);
+                pushRun(run);
+              }}
+            />
+          ) : null}
         </aside>
       </div>
     </div>
   );
 }
 
-function RunResult({ run }: { run: HarnessRun }) {
+function RunResult({ run, onUpdate }: { run: HarnessRun; onUpdate: (run: HarnessRun) => void }) {
+  const [automationBusy, setAutomationBusy] = useState(false);
+  const [automationOutcome, setAutomationOutcome] = useState<string | null>(null);
+  const [remoteTarget, setRemoteTarget] = useState("");
+  const [releaseTag, setReleaseTag] = useState("");
+  const [releaseName, setReleaseName] = useState("");
+
+  async function automate(action: "patch" | "commands") {
+    const message =
+      action === "patch"
+        ? "Apply this independently reviewed patch to the authorized local working tree?"
+        : "Run these reviewed commands inside a network-disabled, disposable container?";
+    if (!window.confirm(message)) return;
+    setAutomationBusy(true);
+    try {
+      const result =
+        action === "patch"
+          ? await applyHarnessPatch({ data: { runId: run.id, confirmation: "APPLY REVIEWED PATCH" } })
+          : await runHarnessCommands({ data: { runId: run.id, confirmation: "RUN IN ISOLATED CONTAINER" } });
+      setAutomationOutcome(result.outcome);
+      onUpdate(result.run);
+      toast.success(action === "patch" ? "Patch applied." : "Container execution finished.");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Automation was stopped.");
+    } finally {
+      setAutomationBusy(false);
+    }
+  }
+
+  async function remote(action: "deployment_to_live_environment" | "pull_request_merge" | "release_publication") {
+    if (!window.confirm("Execute this approved remote action now? It can change an external system.")) return;
+    setAutomationBusy(true);
+    try {
+      const result = await performHarnessRemoteAction({
+        data: {
+          runId: run.id,
+          action,
+          target: remoteTarget,
+          expectedRevision: run.repository?.revision ?? "",
+          releaseTag,
+          releaseName,
+          confirmation: "EXECUTE APPROVED REMOTE ACTION",
+        },
+      });
+      setAutomationOutcome(result.outcome);
+      onUpdate(result.run);
+      toast.success(result.outcome);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Remote action was stopped.");
+    } finally {
+      setAutomationBusy(false);
+    }
+  }
+
+  const canAutomate = run.status === "accepted" && run.verification?.accepted === true;
+  const remoteActions = run.approvedActions.filter((action) =>
+    ["deployment_to_live_environment", "pull_request_merge", "release_publication"].includes(action),
+  ) as Array<"deployment_to_live_environment" | "pull_request_merge" | "release_publication">;
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
@@ -412,6 +572,55 @@ function RunResult({ run }: { run: HarnessRun }) {
               </Badge>
             ))}
           </div>
+        ) : null}
+        {run.repository ? (
+          <p className="text-xs text-muted-foreground">
+            Indexed {run.repository.indexedFiles} files from {run.repository.display}
+            {run.repository.revision ? ` at ${run.repository.revision.slice(0, 12)}` : ""}.
+          </p>
+        ) : null}
+        {canAutomate && run.patch && run.repository?.mutable && run.approvedActions.includes("working_tree_patch") ? (
+          <Button className="w-full" disabled={automationBusy} onClick={() => void automate("patch")}>
+            Apply reviewed patch
+          </Button>
+        ) : null}
+        {canAutomate && run.commands.length > 0 && run.approvedActions.includes("generated_command_execution") ? (
+          <Button className="w-full" variant="secondary" disabled={automationBusy} onClick={() => void automate("commands")}>
+            Run reviewed commands in container
+          </Button>
+        ) : null}
+        {canAutomate && run.repository && remoteActions.length > 0 ? (
+          <div className="space-y-2 rounded-xl bg-secondary p-3">
+            <Label htmlFor="remote-target">Remote target</Label>
+            <Input
+              id="remote-target"
+              value={remoteTarget}
+              onChange={(event) => setRemoteTarget(event.target.value)}
+              placeholder="GitHub URL or deployment target name"
+            />
+            {remoteActions.includes("release_publication") ? (
+              <>
+                <Input value={releaseTag} onChange={(event) => setReleaseTag(event.target.value)} placeholder="Release tag" />
+                <Input value={releaseName} onChange={(event) => setReleaseName(event.target.value)} placeholder="Release name" />
+              </>
+            ) : null}
+            {remoteActions.map((action) => (
+              <Button
+                key={action}
+                className="w-full"
+                variant="destructive"
+                disabled={automationBusy || !remoteTarget.trim()}
+                onClick={() => void remote(action)}
+              >
+                {ACTION_LABELS[action]}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+        {automationOutcome ? (
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-secondary p-3 text-xs">
+            {automationOutcome}
+          </pre>
         ) : null}
       </CardContent>
     </Card>

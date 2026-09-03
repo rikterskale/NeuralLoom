@@ -8,7 +8,7 @@ import type {
 } from "./types.ts";
 import { ROLE_IDS, TASK_ROLE_IDS } from "./types.ts";
 
-export const PROMPT_TEMPLATE_VERSION = "neuralloom.role.v1";
+export const PROMPT_TEMPLATE_VERSION = "neuralloom.role.v2";
 
 export const HARNESS_SPEC = {
   cloud_primary: {

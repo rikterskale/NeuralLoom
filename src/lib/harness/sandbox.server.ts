@@ -3,6 +3,7 @@ import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CheckResult, DeterministicCheck } from "./types";
+import { loadContainerConfig, runIsolatedContainerCommand } from "./container.server.ts";
 
 /**
  * Checks that can only be answered by executing tooling against a real working
@@ -60,6 +61,7 @@ export type SandboxConfig = {
   copyIgnore: string[];
   /** Why the sandbox is not active, when it is not. */
   disabledReason: string | null;
+  mode: "copy" | "container";
 };
 
 function num(name: string, fallback: number, min: number, max: number): number {
@@ -79,10 +81,15 @@ function list(name: string, fallback: string[]): string[] {
     .filter(Boolean);
 }
 
-export function loadSandboxConfig(env: NodeJS.ProcessEnv = process.env): SandboxConfig {
+export function loadSandboxConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  workspaceOverride?: string,
+): SandboxConfig {
   const enabled = env.NEURALLOOM_SANDBOX_ENABLED === "true";
-  const workspace = env.NEURALLOOM_SANDBOX_WORKSPACE?.trim() || null;
+  const workspace = workspaceOverride || env.NEURALLOOM_SANDBOX_WORKSPACE?.trim() || null;
   const commands: Partial<Record<SandboxCheck, string>> = {};
+  const mode = env.NEURALLOOM_SANDBOX_MODE === "container" ? "container" : "copy";
+  const container = loadContainerConfig(env);
   for (const check of SANDBOX_CHECKS) {
     const value = env[ENV_CMD[check]]?.trim();
     if (value) commands[check] = value;
@@ -97,6 +104,9 @@ export function loadSandboxConfig(env: NodeJS.ProcessEnv = process.env): Sandbox
   } else if (Object.keys(commands).length === 0) {
     disabledReason =
       "Sandbox enabled without any NEURALLOOM_SANDBOX_CMD_* commands; no checks are configured to run.";
+  } else if (mode === "container" && (!container.enabled || !container.image)) {
+    disabledReason =
+      "Container sandbox mode requires NEURALLOOM_CONTAINER_ENABLED=true and NEURALLOOM_CONTAINER_IMAGE.";
   }
 
   return {
@@ -109,6 +119,7 @@ export function loadSandboxConfig(env: NodeJS.ProcessEnv = process.env): Sandbox
     maxOutputBytes: num("NEURALLOOM_SANDBOX_MAX_BYTES", 16_000, 1_000, 1_000_000),
     copyIgnore: list("NEURALLOOM_SANDBOX_COPY_IGNORE", ["node_modules", ".git"]),
     disabledReason,
+    mode,
   };
 }
 
@@ -181,7 +192,14 @@ export async function runSandboxChecks(
         results.set(check, skip(check, config));
         continue;
       }
-      const run = await execIn(dir, command, config, env);
+      const run =
+        config.mode === "container"
+          ? await runIsolatedContainerCommand(dir, command, loadContainerConfig()).then((result) => ({
+              code: result.code,
+              timedOut: result.code === 124,
+              output: result.output,
+            }))
+          : await execIn(dir, command, config, env);
       results.set(check, toResult(check, command, run, config));
     }
 

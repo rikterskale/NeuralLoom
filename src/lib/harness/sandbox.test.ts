@@ -9,6 +9,7 @@ import {
   scrubbedEnv,
   type SandboxConfig,
 } from "./sandbox.server.ts";
+import { validateContainerImage } from "./container.server.ts";
 
 test("sandbox is disabled by default with an honest reason", () => {
   const config = loadSandboxConfig({});
@@ -40,6 +41,23 @@ test("a workspace plus one command activates the sandbox", () => {
   assert.equal(config.enabled, true);
   assert.equal(config.disabledReason, null);
   assert.equal(config.commands.linter, "npm run lint");
+});
+
+test("container sandbox mode fails closed without an explicitly configured image", () => {
+  const config = loadSandboxConfig({
+    NEURALLOOM_SANDBOX_ENABLED: "true",
+    NEURALLOOM_SANDBOX_MODE: "container",
+    NEURALLOOM_SANDBOX_WORKSPACE: "/tmp/ws",
+    NEURALLOOM_SANDBOX_CMD_LINTER: "npm run lint",
+  });
+  assert.equal(config.enabled, false);
+  assert.match(config.disabledReason ?? "", /container/i);
+});
+
+test("container image values cannot be interpreted as runtime options", () => {
+  assert.doesNotThrow(() => validateContainerImage("node:22@sha256:abcdef"));
+  assert.throws(() => validateContainerImage("--privileged"), /invalid/);
+  assert.throws(() => validateContainerImage("image name"), /invalid/);
 });
 
 test("scrubbedEnv withholds secrets and non-allowlisted vars", () => {
@@ -81,8 +99,9 @@ test("configured commands run in an isolated snapshot and report real results", 
     const config = loadSandboxConfig({
       NEURALLOOM_SANDBOX_ENABLED: "true",
       NEURALLOOM_SANDBOX_WORKSPACE: workspace,
-      NEURALLOOM_SANDBOX_CMD_LINTER: "test -f marker.txt",
-      NEURALLOOM_SANDBOX_CMD_UNIT_TESTS: "exit 3",
+      NEURALLOOM_SANDBOX_CMD_LINTER:
+        'node -e "require(\'node:fs\').accessSync(\'marker.txt\')"',
+      NEURALLOOM_SANDBOX_CMD_UNIT_TESTS: 'node -e "process.exit(3)"',
     });
     const results = await runSandboxChecks({ patch: null }, config);
     assert.ok(results);
@@ -104,7 +123,8 @@ test("the snapshot is a copy; commands cannot mutate the real workspace", async 
     const config = loadSandboxConfig({
       NEURALLOOM_SANDBOX_ENABLED: "true",
       NEURALLOOM_SANDBOX_WORKSPACE: workspace,
-      NEURALLOOM_SANDBOX_CMD_LINTER: "rm -f keep.txt && test ! -f keep.txt",
+      NEURALLOOM_SANDBOX_CMD_LINTER:
+        'node -e "require(\'node:fs\').unlinkSync(\'keep.txt\')"',
     });
     const results = await runSandboxChecks({ patch: null }, config);
     assert.equal(results?.get("linter")?.status, "pass");

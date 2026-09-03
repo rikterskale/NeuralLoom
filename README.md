@@ -66,7 +66,7 @@ Optional: add an `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `XAI_API_KEY` to `.en
 4. Built-in safety checks run. Checks that need an isolated workspace remain clearly marked as incomplete.
 5. NeuralLoom records the decision while withholding restricted content and masking recognizable secrets.
 
-NeuralLoom displays generated commands but never runs them.
+With opt-in repository automation, NeuralLoom can index an allowlisted local folder or disposable public clone. Generated commands run only after full acceptance and a second confirmation, inside a configured network-disabled Docker or Podman container—never directly on the host.
 
 ## Troubleshooting
 
@@ -97,7 +97,7 @@ If these steps do not help, include your operating system, Node version (`node -
 
 ## Data storage and limitations
 
-Local audit data uses an embedded in-memory PGLite database and resets when the server process restarts. NeuralLoom does not prove generated code is correct. Formatting, type checking, tests, coverage, and dependency auditing that require an isolated workspace stay incomplete rather than being reported as passed, unless you enable the optional workspace runner. That runner snapshots a workspace you designate into a disposable copy, applies the model's patch there only (never to your working tree), and runs the check commands you configure with a secret-scrubbed environment; it isolates by file copy, environment scrubbing, and timeouts, not by kernel-level confinement. See the [Getting Started Guide](docs/GETTING_STARTED.md) and [.env.example](.env.example) for setup.
+Local audit data uses an embedded in-memory PGLite database and resets when the server process restarts. Repository access, working-tree changes, container execution, and remote actions are off by default and currently refuse to run when shared-deployment authentication is enabled. When enabled for single-user local use, mutations require an accepted primary-and-critic review, passing required checks, allowlist and authorization controls, and a second confirmation. NeuralLoom does not prove generated code is correct or secure, grant third-party authorization, or replace human review. See the [Getting Started Guide](docs/GETTING_STARTED.md#repository-and-automation-workflow) and [.env.example](.env.example) for setup and residual risks.
 
 ## Shared deployment
 

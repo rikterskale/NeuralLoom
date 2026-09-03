@@ -1,6 +1,8 @@
 import type { HumanApprovalAction, RunStatus } from "./types";
 
 export const ACTION_LABELS: Record<HumanApprovalAction, string> = {
+  generated_command_execution: "Run generated commands in a container",
+  working_tree_patch: "Apply reviewed patch to working tree",
   outbound_network_access: "Outbound network",
   exploit_execution: "Exploit execution",
   credential_operations: "Credential operations",

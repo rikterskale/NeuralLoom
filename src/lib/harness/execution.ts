@@ -25,8 +25,16 @@ export function evaluateExecution(
   const targetControlFailures: string[] = [];
   const needsTarget =
     input.requestedActions.some((a) => OFFENSIVE.includes(a)) ||
-    input.requestedActions.includes("outbound_network_access") ||
-    input.requestedActions.includes("deployment_to_live_environment");
+    input.requestedActions.some((action) =>
+      [
+        "generated_command_execution",
+        "working_tree_patch",
+        "outbound_network_access",
+        "deployment_to_live_environment",
+        "pull_request_merge",
+        "release_publication",
+      ].includes(action),
+    );
 
   if (needsTarget) {
     const controls = HARNESS_SPEC.execution_policy.target_controls;

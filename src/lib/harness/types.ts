@@ -76,6 +76,8 @@ export type DataClass = KnownDataClass | "unknown";
 export type DataLane = "cloud_permitted" | "explicit_authorization" | "local_only" | "unknown";
 
 export const HUMAN_APPROVAL_ACTIONS = [
+  "generated_command_execution",
+  "working_tree_patch",
   "outbound_network_access",
   "exploit_execution",
   "credential_operations",
@@ -126,6 +128,26 @@ export const CONTEXT_EXCLUDE = [
 ] as const;
 
 export type ContextInclude = (typeof CONTEXT_INCLUDE)[number];
+
+export type RepositorySource = {
+  kind: "none" | "local" | "url";
+  location: string;
+};
+
+export type RepositorySummary = {
+  kind: "local" | "url";
+  display: string;
+  revision: string | null;
+  indexedFiles: number;
+  indexedBytes: number;
+  truncated: boolean;
+  mutable: boolean;
+};
+
+export type GeneratedCommand = {
+  command: string;
+  purpose: string;
+};
 
 export type RoleConfig = {
   id: RoleId;
@@ -265,6 +287,9 @@ export type HarnessRun = {
   patch: string | null;
   output: string | null;
   critic: string | null;
+  commands: GeneratedCommand[];
+  repository: RepositorySummary | null;
+  approvedActions: HumanApprovalAction[];
   events: AuditEvent[];
   authorizationGranted: boolean;
   redactionVerified: boolean;
@@ -304,8 +329,14 @@ export type DispatchInput = {
   requestedActions: HumanApprovalAction[];
   approvedActions: HumanApprovalAction[];
   contextIncludes: ContextInclude[];
+  repository: RepositorySource;
   targetAllowlisted: boolean;
   authorizationRecord: boolean;
   simulatePrimaryFailure: boolean;
   operatorAcceptedLab: boolean;
+};
+
+export type AutomationResult = {
+  run: HarnessRun;
+  outcome: string;
 };

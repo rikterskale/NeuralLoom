@@ -86,7 +86,7 @@ function CommandCenter() {
         <Stat
           label="Commands"
           value="Display only"
-          detail="NeuralLoom never runs generated commands"
+          detail="Generated commands require an accepted run and a network-disabled container"
         />
       </div>
 

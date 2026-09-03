@@ -7,6 +7,14 @@ const provider = readFileSync(
   new URL("../src/lib/harness/providers/ollama.server.ts", import.meta.url),
   "utf8",
 );
+const container = readFileSync(
+  new URL("../src/lib/harness/container.server.ts", import.meta.url),
+  "utf8",
+);
+const repository = readFileSync(
+  new URL("../src/lib/harness/repository.server.ts", import.meta.url),
+  "utf8",
+);
 
 test("every harness server function uses verified auth middleware", () => {
   const declarations = api.match(/createServerFn\(\{ method: "(?:GET|POST)" \}\)/g) ?? [];
@@ -47,4 +55,24 @@ test("hosted provider adapters verify model identity and refuse plaintext keys o
 
 test("the old raw completion endpoint is absent", () => {
   assert.throws(() => readFileSync(new URL("../src/lib/ai/complete.ts", import.meta.url), "utf8"));
+});
+
+test("generated commands are container-only and network-disabled", () => {
+  assert.match(container, /"--network",\s*\n\s*"none"/);
+  assert.match(container, /"--cap-drop",\s*\n\s*"ALL"/);
+  assert.match(container, /"--pull",\s*\n\s*"never"/);
+  assert.match(container, /"--entrypoint",\s*\n\s*"\/bin\/sh"/);
+  assert.match(container, /confirmation !== "RUN IN ISOLATED CONTAINER"/);
+  assert.doesNotMatch(container, /shell:\s*true/);
+});
+
+test("repository fetches require HTTPS allowlisting and disable credential prompts", () => {
+  assert.match(repository, /parsed\.protocol !== "https:"/);
+  assert.match(repository, /NEURALLOOM_REPOSITORY_HOSTS/);
+  assert.match(repository, /GIT_TERMINAL_PROMPT:\s*"0"/);
+});
+
+test("URL fetching is gated before repository preparation", () => {
+  assert.ok(api.indexOf('data.repository.kind === "url"') < api.indexOf("prepareRepository("));
+  assert.match(api, /approvedActions\.includes\("outbound_network_access"\)/);
 });

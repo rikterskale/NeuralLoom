@@ -36,6 +36,7 @@ export const useHarness = create<HarnessState>((set) => ({
       lastDiscoveryAt: discovery.discoveredAt,
     }),
   setLoadError: (loadError) => set({ loadError, loading: false }),
-  pushRun: (run) => set((state) => ({ runs: [run, ...state.runs].slice(0, 80) })),
+  pushRun: (run) =>
+    set((state) => ({ runs: [run, ...state.runs.filter((item) => item.id !== run.id)].slice(0, 80) })),
   clearRuns: () => set({ runs: [] }),
 }));

@@ -1,4 +1,9 @@
-import { DETERMINISTIC_CHECKS, type CheckResult, type VerificationResult } from "./types.ts";
+import {
+  DETERMINISTIC_CHECKS,
+  type CheckResult,
+  type GeneratedCommand,
+  type VerificationResult,
+} from "./types.ts";
 
 const SECRET_RE =
   /\b(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY)\b/;
@@ -10,19 +15,21 @@ export function parseStructured(text: string): {
   plan: string | null;
   patch: string | null;
   notes: string | null;
+  commands: GeneratedCommand[];
   raw: string;
 } {
   const fence = text.match(/```json\s*([\s\S]*?)```/i);
   const blob = fence?.[1] ?? text.match(/\{[\s\S]*"plan"[\s\S]*\}/)?.[0];
   if (!blob) {
     const patch = extractPatch(text);
-    return { plan: null, patch, notes: null, raw: text };
+    return { plan: null, patch, notes: null, commands: [], raw: text };
   }
   try {
     const parsed = JSON.parse(blob) as {
       plan?: unknown;
       patch?: unknown;
       notes?: unknown;
+      commands?: unknown;
     };
     const plan =
       typeof parsed.plan === "string"
@@ -32,10 +39,24 @@ export function parseStructured(text: string): {
           : null;
     const patch = typeof parsed.patch === "string" ? parsed.patch : extractPatch(text);
     const notes = typeof parsed.notes === "string" ? parsed.notes : null;
-    return { plan, patch, notes, raw: text };
+    const commands = parseCommands(parsed.commands);
+    return { plan, patch, notes, commands, raw: text };
   } catch {
-    return { plan: null, patch: extractPatch(text), notes: null, raw: text };
+    return { plan: null, patch: extractPatch(text), notes: null, commands: [], raw: text };
   }
+}
+
+function parseCommands(value: unknown): GeneratedCommand[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 8).flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const raw = entry as Record<string, unknown>;
+    if (typeof raw.command !== "string" || typeof raw.purpose !== "string") return [];
+    const command = raw.command.trim();
+    const purpose = raw.purpose.trim();
+    if (!command || command.length > 1_000 || command.includes("\0")) return [];
+    return [{ command, purpose: purpose.slice(0, 240) }];
+  });
 }
 
 export function extractPatch(text: string): string | null {

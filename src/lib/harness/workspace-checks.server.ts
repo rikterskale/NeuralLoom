@@ -15,11 +15,12 @@ export async function verifyArtifact(opts: {
   output: string;
   patch: string | null;
   plan: string | null;
+  workspace?: string;
 }): Promise<CheckResult[]> {
   const contentChecks = runDeterministicChecks(opts);
   const byId = new Map(contentChecks.map((check) => [check.id, check]));
 
-  const config = loadSandboxConfig();
+  const config = loadSandboxConfig(process.env, opts.workspace);
   const sandbox = await runSandboxChecks({ patch: opts.patch }, config);
 
   const results: CheckResult[] = [];

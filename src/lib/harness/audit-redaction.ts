@@ -19,5 +19,15 @@ export function redactRunForAudit(run: HarnessRun): HarnessRun {
     patch: restricted ? null : redactText(run.patch),
     output: restricted ? null : redactText(run.output),
     critic: restricted ? null : redactText(run.critic),
+    repository:
+      restricted && run.repository
+        ? { ...run.repository, display: "[withheld]", revision: null }
+        : run.repository,
+    commands: restricted
+      ? []
+      : (run.commands ?? []).map((command) => ({
+          command: redactText(command.command)!,
+          purpose: redactText(command.purpose)!,
+        })),
   };
 }

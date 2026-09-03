@@ -8,7 +8,7 @@ This guide takes you from a new checkout to your first reviewed AI task. It assu
 
 1. [What NeuralLoom is](#what-neuralloom-is)
 2. [What you can do with NeuralLoom](#what-you-can-do-with-neuralloom)
-3. [What NeuralLoom does not do yet](#what-neuralloom-does-not-do-yet)
+3. [Repository and automation workflow](#repository-and-automation-workflow)
 4. [How NeuralLoom protects your work](#how-neuralloom-protects-your-work)
 5. [Before you install](#before-you-install)
 6. [Install and set up NeuralLoom](#install-and-set-up-neuralloom)
@@ -59,7 +59,7 @@ Example:
 
 > Propose a unified diff that extracts duplicated retry logic into a helper and adds unit tests. The example is from a public repository.
 
-NeuralLoom displays proposed code and commands. You remain responsible for reviewing and applying them.
+NeuralLoom displays proposed code and commands. With repository automation enabled, a fully accepted run can apply a reviewed patch or run reviewed commands after a second explicit confirmation. You remain responsible for reviewing the result.
 
 ### Triage sanitized failures
 
@@ -87,7 +87,7 @@ Example:
 
 > Based on this public package description and dependency summary, identify the modules likely affected by replacing the caching interface. Produce a migration checklist.
 
-The current application does not automatically read your repository. Include only the safe, relevant context in the task description, and do not assume NeuralLoom has seen files you did not provide.
+By default NeuralLoom does not read a repository. In the single-user local app, you can deliberately enable repository automation and select an allowlisted local folder or public HTTPS repository URL. NeuralLoom then builds bounded context from only the categories selected for the task.
 
 ### Perform defensive security review
 
@@ -116,34 +116,33 @@ Use the **Safety**, **Checks**, **Models**, and **Audit** pages to understand:
 
 If you identify credentials or live evidence, NeuralLoom can record that the task was refused before any cloud model call. This gives you an auditable safety decision without sending the restricted content onward.
 
-## What NeuralLoom does not do yet
+## Repository and automation workflow
 
-Understanding these boundaries prevents unsafe assumptions.
+Repository access and mutations are off by default. In the single-user local app, set `NEURALLOOM_REPOSITORY_ENABLED=true`, configure `NEURALLOOM_REPOSITORY_ROOTS`, and select a repository source in the task form. Local paths must be absolute and remain under an allowed root. Public URL sources must use HTTPS, contain no embedded credentials, and use a host in `NEURALLOOM_REPOSITORY_HOSTS`; they are shallow-cloned into a temporary directory and removed after the run. A GitHub pull-request URL is checked out at that pull request's exact head ref so a later merge remains bound to the reviewed SHA.
 
-NeuralLoom currently does **not**:
+Indexing is selective and bounded. NeuralLoom excludes dependency/vendor directories, build output, binary files, symlinks, `.env`, key files, credential files, and other secret-like filenames. Recognizable secrets detected in indexed text override a less-sensitive label before any cloud-model call. Repository content is treated as untrusted data, not as instructions.
 
-- automatically open, index, or modify the repository on your computer;
-- automatically fetch a repository from a URL mentioned in a task;
-- apply a generated patch to your working tree (a patch is applied only inside a disposable sandbox snapshot when the optional workspace runner is enabled — see below — never to the repository you work in);
-- run generated shell commands (the sandbox runs only the check commands _you_ configure, never commands produced by a model);
-- deploy software, merge pull requests, or publish releases;
-- provide an operating-system or network jail (the optional runner isolates by disposable file copy, a secret-scrubbed environment, and time limits, not by kernel-level confinement);
-- run workspace-dependent formatting, linting, type checking, tests, coverage, or dependency auditing unless you enable and configure the optional workspace runner below;
-- guarantee that AI-generated code is correct or secure;
-- replace code review, testing, change management, or professional security judgment;
-- make restricted information safe merely because you selected a less-sensitive label; or
-- authorize work against a third-party system.
+After the primary model, independent critic, and every required check accept a run:
 
-Checks that require an isolated workspace runner remain visibly incomplete. NeuralLoom does not count a missing check as a pass.
+- a reviewed patch may be applied once to the same allowlisted local working tree after a second confirmation; target files are hashed at review time, and any intervening target change blocks application;
+- reviewed generated commands may run once in a pre-existing Docker or Podman image after a second confirmation; the container receives a disposable repository copy, no application credentials, no network, a read-only root filesystem, dropped capabilities, and bounded CPU, memory, process count, output, and time;
+- configured checks may use the same container boundary with `NEURALLOOM_SANDBOX_MODE=container`; and
+- approved GitHub pull-request merges, GitHub releases, or HTTPS deployment-webhook requests may run through dedicated adapters after a second confirmation. Each action also requires explicit outbound-network approval, an allowlisted target, an authorization record, an exact reviewed revision, and separately configured least-privilege credentials.
+
+These controls reduce risk but do not guarantee generated code is correct or secure, replace review or professional judgment, make restricted information safe through relabeling, or grant authorization against a third-party system. Container isolation depends on the configured OCI runtime and image and is not a promise against runtime or kernel vulnerabilities. Repository automation is currently limited to single-user local mode and refuses to run when `VITE_AUTH_ENABLED=true`; per-user workspace isolation for shared deployments is not yet implemented.
+
+Checks that require a workspace runner remain visibly incomplete when the runner is disabled or partly configured. NeuralLoom never counts a missing check as a pass.
 
 ### Optional: the isolated workspace runner
 
 By default the workspace-dependent checks (formatter, linter, type checker, unit and integration tests, coverage, dependency audit) report as **skip** — never as a pass — because no runner is attached. You can attach one deliberately. When enabled, NeuralLoom:
 
-1. copies a workspace you designate into a fresh temporary directory, so your real working tree is never opened or modified;
+1. copies the task repository (or a configured fallback workspace) into a fresh temporary directory;
 2. applies the model's proposed patch **inside that copy only**;
 3. runs the exact check commands you configured, each with a timeout and captured output; and
-4. builds the child environment from a short allowlist, withholding API keys, tokens, `DATABASE_URL`, the Ollama endpoint, and anything whose value looks like a secret — so a generated patch cannot read or send your credentials.
+4. builds the child environment from a short allowlist, withholding API keys, tokens, `DATABASE_URL`, the Ollama endpoint, and anything whose value looks like a secret, so configured checks do not inherit application credentials.
+
+Set `NEURALLOOM_SANDBOX_MODE=container` to run configured checks inside the network-disabled OCI boundary. Copy mode remains available for trusted operator-configured checks; model-generated commands never use copy mode and never execute directly on the host.
 
 A check with no configured command stays `skip`. A patch that fails to apply, a command that exits non-zero, or a command that times out is a `fail`. Acceptance still requires every required check to pass, so an unattached or partly-configured runner can never turn a run green on its own.
 
@@ -151,7 +150,9 @@ Enable it with environment variables (see [.env.example](../.env.example)):
 
 ```text
 NEURALLOOM_SANDBOX_ENABLED=true
-NEURALLOOM_SANDBOX_WORKSPACE=/absolute/path/to/a/prepared/workspace
+NEURALLOOM_SANDBOX_MODE=container
+NEURALLOOM_CONTAINER_ENABLED=true
+NEURALLOOM_CONTAINER_IMAGE=your-preloaded-check-image@sha256:...
 NEURALLOOM_SANDBOX_CMD_LINTER=npm run lint
 NEURALLOOM_SANDBOX_CMD_TYPE_CHECKER=npm run typecheck
 NEURALLOOM_SANDBOX_CMD_UNIT_TESTS=npm test
@@ -181,9 +182,9 @@ NeuralLoom maintains an approved model list. It checks the model reported by the
 
 The critic checks correctness, security, architecture, documentation, hallucination risk, and test gaps. A response is not accepted merely because the first model produced an answer.
 
-### Commands are display-only
+### Commands require container isolation and two approvals
 
-Models may propose code, patches, or commands. The web application does not execute them.
+Models may propose code, patches, or commands. A generated command runs only when command execution was declared and approved before the model call, the run was fully accepted, the user confirms again, and the configured OCI container boundary is available. NeuralLoom never falls back to executing a model-generated command directly on the host.
 
 ### Audit records minimize restricted content
 
@@ -465,7 +466,7 @@ The **Critic** is used independently by the review pipeline and is not offered a
 
 Choosing a role does not bypass information or approval policies.
 
-### Actions the answer may discuss
+### Actions to permit after independent review
 
 Some actions carry additional risk and require human approval. Examples include:
 
@@ -484,7 +485,7 @@ Mark an action as requested only when it is genuinely part of the task. Mark it 
 
 For network, exploitation, credential, authentication, persistence, lateral-movement, or live-deployment work, NeuralLoom also expects target controls such as an allowlist and an authorization record.
 
-The application does not execute these actions. The controls govern what the generated response may discuss and how the decision is recorded.
+These controls permit the model to propose the action; they do not execute it. Patch, command, deployment, merge, and release actions require a fully accepted run and a second confirmation. Missing infrastructure, credentials, authorization records, or allowlist entries stop the action.
 
 ### Context to use
 
@@ -499,7 +500,7 @@ Context choices describe the types of material relevant to the task:
 - recent diffs; and
 - applicable documentation.
 
-These selections do not automatically grant NeuralLoom access to files. In the current build, NeuralLoom does not crawl your repository. They communicate the intended scope to the routing and policy layer.
+Without a repository source these selections only communicate intended scope. When repository automation is enabled and a source is selected, they control which bounded text files are indexed and included as untrusted model context.
 
 Build artifacts, vendor dependency directories, binary files, secrets, and unrelated large files are excluded by default.
 
@@ -523,7 +524,7 @@ The plan explains the proposed approach. Confirm that it matches your objective 
 
 ### Patch or output
 
-Treat all generated content as untrusted input. Read every line before copying it into a repository. Never run a generated command merely because it appears in an accepted response.
+Treat all generated content as untrusted input. Read every line before applying a patch or confirming container execution. Acceptance and isolation reduce risk but do not establish correctness.
 
 ### Critic
 
@@ -531,7 +532,7 @@ The critic is an independent model review, not a guarantee. Pay attention to cor
 
 ### Checks
 
-A check can pass, fail, or remain incomplete. In the current build, checks that require an isolated repository workspace cannot run automatically. Perform those checks through your normal development workflow before accepting a change.
+A check can pass, fail, or remain incomplete. With the optional workspace runner configured, checks run against a disposable repository copy; container mode also denies network access and adds OCI isolation. Missing or failed checks prevent acceptance.
 
 ## Navigate the application
 
@@ -628,8 +629,8 @@ Describe an invented task that explicitly says it contains a fake API key, then 
 11. Declare high-risk actions and approvals accurately.
 12. Read the status, critic feedback, and check results.
 13. Review proposed code manually.
-14. Apply changes through your normal development tools.
-15. Run your repository's formatter, linter, type checker, tests, security scan, and dependency audit in an appropriate environment.
+14. Apply changes through your normal development tools, or use the post-review patch action after inspecting every line.
+15. Run your repository's checks in an appropriate environment, or configure the optional workspace runner and inspect every result.
 16. Commit only changes you understand.
 17. Stop NeuralLoom with `Ctrl+C` when finished.
 
@@ -649,6 +650,9 @@ Available settings include:
 - `VITE_AUTH_ENABLED`: remains `false` for normal single-user local use; shared deployments must enable authentication.
 - `DATABASE_URL`: optional for local use; required for the supported PostgreSQL shared-deployment path.
 - `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET`: deployment authentication settings, not normal local setup values.
+- `NEURALLOOM_REPOSITORY_*`: opt-in local-root and public-URL repository indexing limits.
+- `NEURALLOOM_SANDBOX_*` and `NEURALLOOM_CONTAINER_*`: disposable workspace checks and container-only generated-command execution.
+- `NEURALLOOM_GITHUB_*` and `NEURALLOOM_DEPLOY_WEBHOOK_*`: opt-in, separately credentialed remote-action adapters.
 
 Do not place a credential in `.env.example`, source code, documentation, screenshots, or bug reports.
 
@@ -783,15 +787,15 @@ It can. When installed local Ollama models are selected for your roles, includin
 
 ### Does NeuralLoom upload my whole repository?
 
-No. The current build does not automatically read or upload your repository. It sends the permitted task content used by the harness. You should still minimize and sanitize everything you enter.
+Not by default. When repository automation is deliberately enabled and a source is selected, NeuralLoom indexes a bounded, filtered subset and sends it only to the model permitted by the classified data lane. It never uploads an entire repository as one artifact. You should still minimize the selected context and inspect the information classification.
 
 ### Can NeuralLoom edit my files?
 
-No. It can propose code or a patch, but it does not apply changes to your workspace.
+Only through the explicit post-review workflow. A patch must pass the critic and every configured required check, target the same authorized local repository, match unchanged target-file hashes, and receive a second confirmation.
 
 ### Can NeuralLoom run commands?
 
-No. Generated commands are display-only.
+Only inside the configured Docker or Podman boundary. Commands require pre-task approval, a fully accepted run, and a second confirmation. They receive a disposable workspace copy, no app secrets, and no network; NeuralLoom never executes them directly on the host.
 
 ### Can I paste a token if I choose the credentials option?
 
@@ -803,7 +807,7 @@ The critic gives the first response an independent review for correctness, secur
 
 ### Why is an apparently good response marked Needs acceptance?
 
-Some required checks need an isolated repository workspace, which the current application does not provide. NeuralLoom reports those checks as incomplete rather than pretending they passed.
+Some required checks need the optional workspace runner. NeuralLoom reports disabled, missing, or partly configured checks as incomplete rather than pretending they passed.
 
 ### Can I use private personal code?
 
@@ -862,7 +866,7 @@ The first command runs type checking, linting, and automated tests. The second c
 
 **Ollama:** The model service NeuralLoom connects to. The local Ollama application exposes an API on your computer and can route approved cloud-model requests.
 
-**Patch:** A proposed set of code changes, often shown as a unified diff. A patch must still be reviewed and applied through your development workflow.
+**Patch:** A proposed set of code changes, often shown as a unified diff. A patch must still be reviewed; an accepted patch may be applied through the explicit post-review working-tree action.
 
 **PGLite:** The embedded PostgreSQL-compatible database used for temporary local audit data.
 
@@ -872,7 +876,7 @@ The first command runs type checking, linting, and automated tests. The second c
 
 **Sanitized data:** Content from which credentials, personal information, customer information, live evidence, and other restricted details have been removed.
 
-**Workspace runner:** An isolated environment capable of opening a repository and running formatters, tests, security checks, and other commands. NeuralLoom does not currently include one.
+**Workspace runner:** An optional disposable-copy environment for repository checks. Container mode adds a network-disabled OCI boundary and is mandatory for executing model-generated commands.
 
 ## Next steps
 

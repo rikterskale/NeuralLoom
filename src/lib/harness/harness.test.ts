@@ -28,6 +28,7 @@ const baseInput: DispatchInput = {
   requestedActions: [],
   approvedActions: [],
   contextIncludes: ["relevant_source_files"],
+  repository: { kind: "none", location: "" },
   targetAllowlisted: false,
   authorizationRecord: false,
   simulatePrimaryFailure: false,
@@ -40,6 +41,28 @@ test("server validation rejects client-invented roles and actions", () => {
   assert.throws(
     () => validateDispatchInput({ ...baseInput, requestedActions: ["run_anything"] }),
     /unsupported value/,
+  );
+});
+
+test("automation actions require a compatible repository source", () => {
+  assert.throws(
+    () =>
+      validateDispatchInput({
+        ...baseInput,
+        requestedActions: ["working_tree_patch"],
+        approvedActions: ["working_tree_patch"],
+      }),
+    /require a repository source/,
+  );
+  assert.throws(
+    () =>
+      validateDispatchInput({
+        ...baseInput,
+        repository: { kind: "url", location: "https://github.com/example/project" },
+        requestedActions: ["working_tree_patch"],
+        approvedActions: ["working_tree_patch"],
+      }),
+    /requires a local repository/,
   );
 });
 
@@ -227,7 +250,29 @@ test("audit redaction withholds restricted content and masks public secrets", ()
     ),
   );
   restricted.output = "private source";
+  restricted.repository = {
+    kind: "local",
+    display: "private-client-name",
+    revision: "secret-commit",
+    indexedFiles: 2,
+    indexedBytes: 100,
+    truncated: false,
+    mutable: true,
+  };
   const safe = redactRunForAudit(restricted);
   assert.match(safe.objective, /withheld/);
   assert.equal(safe.output, null);
+  assert.equal(safe.repository?.display, "[withheld]");
+  assert.equal(safe.repository?.revision, null);
+});
+
+test("secrets found in indexed repository context override a public task label", () => {
+  const snapshot = evaluateDispatch(
+    baseInput,
+    buildInventory(),
+    ROLE_CATALOG,
+    `${baseInput.objective}\npassword=repository-secret`,
+  );
+  assert.equal(snapshot.classification.lane, "local_only");
+  assert.equal(snapshot.canCallModel, false);
 });

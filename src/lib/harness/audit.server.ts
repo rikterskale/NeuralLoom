@@ -21,8 +21,28 @@ export async function readRuns(userId: string): Promise<HarnessRun[]> {
     [userId],
   );
   return rows.map(({ payload }) =>
-    typeof payload === "string" ? (JSON.parse(payload) as HarnessRun) : payload,
+    normalizeRun(typeof payload === "string" ? (JSON.parse(payload) as HarnessRun) : payload),
   );
+}
+
+export async function readRun(userId: string, runId: string): Promise<HarnessRun | null> {
+  const sql = await getSql();
+  const rows = await sql.query<{ payload: HarnessRun | string }>(
+    `select payload from neural_loom_runs where user_id = $1 and id = $2 limit 1`,
+    [userId, runId],
+  );
+  const payload = rows[0]?.payload;
+  if (!payload) return null;
+  return normalizeRun(typeof payload === "string" ? (JSON.parse(payload) as HarnessRun) : payload);
+}
+
+function normalizeRun(run: HarnessRun): HarnessRun {
+  return {
+    ...run,
+    commands: run.commands ?? [],
+    repository: run.repository ?? null,
+    approvedActions: run.approvedActions ?? [],
+  };
 }
 
 export async function deleteRuns(userId: string): Promise<void> {

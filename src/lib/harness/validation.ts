@@ -6,6 +6,7 @@ import {
   type DispatchInput,
   type HumanApprovalAction,
   type KnownDataClass,
+  type RepositorySource,
 } from "./types.ts";
 import { CLOUD_PERMITTED, EXPLICIT_AUTH_REQUIRED, LOCAL_ONLY } from "./types.ts";
 
@@ -38,6 +39,21 @@ function stringArray(value: unknown, name: string, allowed: Set<string>): string
   return items as string[];
 }
 
+function repositorySource(value: unknown): RepositorySource {
+  if (value === undefined || value === null) return { kind: "none", location: "" };
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Repository source must be an object");
+  }
+  const raw = value as Record<string, unknown>;
+  const kind = text(raw.kind ?? "none", "Repository kind", 16);
+  if (!(["none", "local", "url"] as const).includes(kind as RepositorySource["kind"])) {
+    throw new Error("Unsupported repository source");
+  }
+  const location = text(raw.location ?? "", "Repository location", 2_048);
+  if (kind !== "none" && !location) throw new Error("Repository location is required");
+  return { kind: kind as RepositorySource["kind"], location };
+}
+
 export function validateDispatchInput(value: unknown): DispatchInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid dispatch request");
@@ -53,6 +69,26 @@ export function validateDispatchInput(value: unknown): DispatchInput {
     "Approved actions",
     ACTIONS,
   ).filter((action) => requestedActions.includes(action));
+  const repository = repositorySource(raw.repository);
+  const repositoryActions = new Set([
+    "generated_command_execution",
+    "working_tree_patch",
+    "deployment_to_live_environment",
+    "pull_request_merge",
+    "release_publication",
+  ]);
+  if (requestedActions.some((action) => repositoryActions.has(action)) && repository.kind === "none") {
+    throw new Error("Repository automation actions require a repository source");
+  }
+  if (requestedActions.includes("working_tree_patch") && repository.kind !== "local") {
+    throw new Error("Working-tree patch application requires a local repository source");
+  }
+  if (
+    requestedActions.some((action) => ["pull_request_merge", "release_publication"].includes(action)) &&
+    repository.kind !== "url"
+  ) {
+    throw new Error("GitHub merge and release actions require a public repository URL source");
+  }
 
   return {
     title: text(raw.title ?? "", "Title", 160),
@@ -72,6 +108,7 @@ export function validateDispatchInput(value: unknown): DispatchInput {
       "Context",
       CONTEXTS,
     ) as ContextInclude[],
+    repository,
     targetAllowlisted: bool(raw.targetAllowlisted),
     authorizationRecord: bool(raw.authorizationRecord),
     simulatePrimaryFailure:
