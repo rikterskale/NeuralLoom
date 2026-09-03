@@ -51,24 +51,13 @@ export function routeRole(opts: {
   const role = opts.requested === "auto" ? autoRole(opts.objective) : opts.requested;
   const config = (opts.catalog ?? ROLE_CATALOG)[role];
   const available = new Map(opts.inventory.map((m) => [m.name, m]));
-
-  if (opts.classification.lane === "local_only") {
-    return {
-      role,
-      selectedModel: null,
-      candidate: config.primary,
-      usedFallback: false,
-      fallbackReason: null,
-      denied: true,
-      denyReason:
-        "never_fallback_local_only_data_to_cloud — local-only data cannot ride a cloud model, including fallbacks",
-    };
-  }
+  const localOnly = opts.classification.lane === "local_only";
 
   if (opts.classification.lane === "unknown") {
     return {
       role,
       selectedModel: null,
+      selectedProvider: null,
       candidate: config.primary,
       usedFallback: false,
       fallbackReason: null,
@@ -78,11 +67,12 @@ export function routeRole(opts: {
   }
 
   const primary = available.get(config.primary);
-  if (!primary || !primary.available) {
+  if ((!primary || !primary.available) && !localOnly) {
     if (opts.failClosedWhenPrimaryMissing) {
       return {
         role,
         selectedModel: null,
+        selectedProvider: null,
         candidate: config.primary,
         usedFallback: false,
         fallbackReason: null,
@@ -99,12 +89,14 @@ export function routeRole(opts: {
     const name = chain[i];
     const rec = available.get(name);
     if (!rec?.available) continue;
+    if (localOnly && rec.provider !== "ollama_local") continue;
     if (opts.preventUnapprovedSubstitution && !chain.includes(name)) {
       continue;
     }
     return {
       role,
       selectedModel: name,
+      selectedProvider: rec.provider,
       candidate: config.primary,
       usedFallback: i > 0,
       fallbackReason:
@@ -121,11 +113,14 @@ export function routeRole(opts: {
   return {
     role,
     selectedModel: null,
+    selectedProvider: null,
     candidate: config.primary,
     usedFallback: startAt > 0,
     fallbackReason: opts.simulatePrimaryFailure ? `Primary ${config.primary} call failed` : null,
     denied: true,
     denyReason:
-      "No approved model in the role chain is available. Unapproved substitution is forbidden.",
+      localOnly
+        ? "Local-only data requires an available local Ollama model for this role."
+        : "No approved model in the role chain is available. Unapproved substitution is forbidden.",
   };
 }

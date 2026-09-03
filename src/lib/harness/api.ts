@@ -40,9 +40,14 @@ export const refreshModelDiscovery = createServerFn({ method: "POST" })
 
 export const saveAndTestModelSettings = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((value: unknown) => parseModelSettings(value))
+  .validator((value: unknown) => value)
   .handler(async ({ data, context }): Promise<ModelSettingsResult> => {
-    const settings = await writeModelSettings(context.userId, data);
+    const initialDiscovery = await discoverModels(true, ROLE_CATALOG);
+    const localModels = initialDiscovery.inventory
+      .filter((model) => model.available && model.provider === "ollama_local")
+      .map((model) => model.name);
+    const settings = parseModelSettings(data, localModels);
+    await writeModelSettings(context.userId, settings, localModels);
     const discovery = await discoverModels(true, catalogForModelSettings(settings));
     const available = new Set(
       discovery.inventory.filter((model) => model.available).map((model) => model.name),
@@ -101,6 +106,7 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
         system: roleSystemPrompt(run.role),
         user: buildUserPrompt(run, data),
         maxTokens: run.role === "fast_triage" ? 500 : 900,
+        allowedProvider: run.classification.lane === "local_only" ? "ollama_local" : null,
         catalog,
       });
       run = applyActualRoute(run, primary);
@@ -121,6 +127,7 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
         system: criticSystemPrompt(),
         user: `Review this ${run.role} artifact.\n\n${primary.completion.text}`,
         maxTokens: 500,
+        allowedProvider: run.classification.lane === "local_only" ? "ollama_local" : null,
         catalog,
       });
       const verdict = parseCriticVerdict(critic.completion.text);
@@ -213,13 +220,11 @@ async function completeRoleWithFallback(opts: {
   system: string;
   user: string;
   maxTokens: number;
+  allowedProvider: "ollama_local" | "ollama_cloud" | null;
   catalog?: Record<RoleId, RoleConfig>;
 }): Promise<CompletionRoute> {
   const config = (opts.catalog ?? ROLE_CATALOG)[opts.role];
   const records = new Map(opts.inventory.map((model) => [model.name, model]));
-  if (!records.get(config.primary)?.available) {
-    throw new Error(`Required primary model ${config.primary} was not discovered`);
-  }
   const approved = [config.primary, ...config.fallbacks];
   const initial =
     opts.firstModel && approved.includes(opts.firstModel) ? approved.indexOf(opts.firstModel) : 0;
@@ -228,6 +233,7 @@ async function completeRoleWithFallback(opts: {
     const model = approved[index];
     const record = records.get(model);
     if (!record?.available) continue;
+    if (opts.allowedProvider && record.provider !== opts.allowedProvider) continue;
     if (opts.simulatePrimaryFailure && index === 0) {
       lastError = `Primary ${model} failure simulated`;
       continue;

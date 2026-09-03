@@ -18,6 +18,7 @@ export const TASK_ROLE_IDS = [
 export type TaskRoleId = (typeof TASK_ROLE_IDS)[number];
 
 export type ThinkLevel = "low" | "high" | "max";
+export type ModelProvider = "ollama_local" | "ollama_cloud";
 
 export const CLOUD_PERMITTED = [
   "public_repositories",
@@ -148,6 +149,7 @@ export type ModelRecord = {
   name: string;
   digest: string;
   available: boolean;
+  provider: ModelProvider;
   source: "configured" | "discovered";
   usedBy: RoleId[];
 };
@@ -164,6 +166,7 @@ export type Classification = {
 export type RouteDecision = {
   role: RoleId;
   selectedModel: string | null;
+  selectedProvider: ModelProvider | null;
   candidate: string;
   usedFallback: boolean;
   fallbackReason: string | null;

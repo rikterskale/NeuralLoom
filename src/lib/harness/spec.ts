@@ -1,4 +1,11 @@
-import type { ModelRecord, ModelSettings, RoleConfig, RoleId, TaskRoleId } from "./types.ts";
+import type {
+  ModelProvider,
+  ModelRecord,
+  ModelSettings,
+  RoleConfig,
+  RoleId,
+  TaskRoleId,
+} from "./types.ts";
 import { ROLE_IDS, TASK_ROLE_IDS } from "./types.ts";
 
 export const PROMPT_TEMPLATE_VERSION = "neuralloom.role.v1";
@@ -169,6 +176,10 @@ export type ModelChoice = {
   description: string;
 };
 
+export function modelProvider(name: string): ModelProvider {
+  return name.endsWith(":cloud") || name.endsWith("-cloud") ? "ollama_cloud" : "ollama_local";
+}
+
 export const MODEL_CHOICES: Record<RoleId, ModelChoice[]> = {
   planner: [
     {
@@ -278,7 +289,7 @@ export function defaultModelSettings(): ModelSettings {
   return Object.fromEntries(ROLE_IDS.map((id) => [id, ROLE_CATALOG[id].primary])) as ModelSettings;
 }
 
-export function parseModelSettings(value: unknown): ModelSettings {
+export function parseModelSettings(value: unknown, localModels: Iterable<string> = []): ModelSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Choose one model for every role.");
   }
@@ -286,8 +297,28 @@ export function parseModelSettings(value: unknown): ModelSettings {
   const settings = {} as ModelSettings;
   for (const id of ROLE_IDS) {
     const model = raw[id];
-    if (typeof model !== "string" || !MODEL_CHOICES[id].some((choice) => choice.name === model)) {
+    if (
+      typeof model !== "string" ||
+      (!MODEL_CHOICES[id].some((choice) => choice.name === model) &&
+        !new Set(localModels).has(model))
+    ) {
       throw new Error(`The selected model does not work with ${ROLE_CATALOG[id].label}.`);
+    }
+    settings[id] = model;
+  }
+  return settings;
+}
+
+export function parsePersistedModelSettings(value: unknown): ModelSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Saved model settings are invalid.");
+  }
+  const raw = value as Record<string, unknown>;
+  const settings = {} as ModelSettings;
+  for (const id of ROLE_IDS) {
+    const model = raw[id];
+    if (typeof model !== "string" || !model.trim()) {
+      throw new Error("Saved model settings are invalid.");
     }
     settings[id] = model;
   }
@@ -344,6 +375,7 @@ export function buildInventory(
     name,
     digest: "unverified",
     available: !unavailable.includes(name),
+    provider: modelProvider(name),
     source: "configured" as const,
     usedBy: usage[name] ?? [],
   }));

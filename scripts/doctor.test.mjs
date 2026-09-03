@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   isLoopbackEndpoint,
+  hasLocalReviewPath,
   modelNamesFromSpec,
   parseEnv,
   recommendedModel,
@@ -53,4 +54,9 @@ test("doctor requires both a task primary and the critic primary", () => {
   assert.deepEqual(usableTaskRoles(primaries, ["code:cloud"]), []);
   assert.deepEqual(usableTaskRoles(primaries, ["review:cloud"]), []);
   assert.deepEqual(usableTaskRoles(primaries, ["code:cloud", "review:cloud"]), ["coder"]);
+});
+
+test("doctor recognizes an installed local review path", () => {
+  assert.equal(hasLocalReviewPath(["llama3.1:8b"]), true);
+  assert.equal(hasLocalReviewPath(["gemma4:31b-cloud"]), false);
 });

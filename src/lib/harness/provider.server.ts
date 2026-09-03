@@ -1,4 +1,10 @@
-import { allConfiguredModels, modelUsage, roleModelsFromCatalog, ROLE_CATALOG } from "./spec";
+import {
+  allConfiguredModels,
+  modelProvider,
+  modelUsage,
+  roleModelsFromCatalog,
+  ROLE_CATALOG,
+} from "./spec";
 import type { ModelDiscovery, ModelRecord, RoleConfig, RoleId } from "./types";
 
 const DEFAULT_ENDPOINT = "http://127.0.0.1:11434";
@@ -88,10 +94,12 @@ function buildDiscovery(
   discoveredAt: number,
 ): ModelDiscovery {
   const usage = modelUsage(catalog);
-  const inventory: ModelRecord[] = allConfiguredModels(catalog).map((name) => ({
+  const names = [...new Set([...allConfiguredModels(catalog), ...found.keys()])];
+  const inventory: ModelRecord[] = names.map((name) => ({
     name,
     digest: found.get(name)?.digest ?? "unavailable",
     available: found.has(name),
+    provider: modelProvider(name),
     source: found.has(name) ? "discovered" : "configured",
     usedBy: usage[name] ?? [],
   }));

@@ -46,6 +46,17 @@ function ModelsPage() {
     discovery?.inventory.some((model) => model.name === selections.critic && model.available),
   );
   const allReady = readyRoles.length === 5 && reviewerReady;
+  const localChoices = useMemo(
+    () =>
+      (discovery?.inventory ?? [])
+        .filter((model) => model.available && model.provider === "ollama_local")
+        .map((model) => ({
+          name: model.name,
+          label: "Installed locally",
+          description: "Runs on this computer through Ollama.",
+        })),
+    [discovery],
+  );
   const checkByRole = useMemo(() => new Map(checks.map((check) => [check.role, check])), [checks]);
 
   function choose(role: RoleId, model: string) {
@@ -148,7 +159,17 @@ function ModelsPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {ROLE_IDS.map((role) => {
-          const selected = MODEL_CHOICES[role].find((choice) => choice.name === selections[role])!;
+          const choices = [
+            ...MODEL_CHOICES[role],
+            ...localChoices.filter(
+              (choice) => !MODEL_CHOICES[role].some((approved) => approved.name === choice.name),
+            ),
+          ];
+          const selected = choices.find((choice) => choice.name === selections[role]) ?? {
+            name: selections[role],
+            label: "Saved selection",
+            description: "This model is no longer in the current Ollama inventory.",
+          };
           const record = discovery?.inventory.find((model) => model.name === selections[role]);
           const latestCheck = checkByRole.get(role);
           const available = latestCheck?.available ?? record?.available ?? false;
@@ -180,7 +201,7 @@ function ModelsPage() {
                   onChange={(event) => choose(role, event.target.value)}
                   disabled={saving}
                 >
-                  {MODEL_CHOICES[role].map((choice) => (
+                  {choices.map((choice) => (
                     <option key={choice.name} value={choice.name}>
                       {choice.label} — {plainModelName(choice.name)}
                     </option>
@@ -191,6 +212,11 @@ function ModelsPage() {
                   <p className="mt-0.5 text-sm text-muted-foreground">{selected.description}</p>
                   <p className="mt-2 font-mono text-[11px] text-muted-foreground">
                     {selected.name}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">
+                    {selected.name.endsWith(":cloud") || selected.name.endsWith("-cloud")
+                      ? "Ollama Cloud"
+                      : "Runs locally"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">

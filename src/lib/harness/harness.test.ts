@@ -12,7 +12,7 @@ import {
   readyTaskRoles,
   ROLE_CATALOG,
 } from "./spec.ts";
-import { autoRole } from "./route.ts";
+import { autoRole, routeRole } from "./route.ts";
 import type { DispatchInput } from "./types.ts";
 import { validateDispatchInput } from "./validation.ts";
 import { assembleVerification } from "./verify.ts";
@@ -114,6 +114,41 @@ test("model settings accept approved choices and drive runtime routing", () => {
   );
   assert.equal(snapshot.route.selectedModel, "glm-5.3:cloud");
   assert.equal(catalog.critic.primary, "qwen3.5:397b-cloud");
+});
+
+test("installed local models can be selected and route local-only work locally", () => {
+  const localModel = "llama3.1:8b";
+  const settings = parseModelSettings(
+    Object.fromEntries(Object.keys(defaultModelSettings()).map((role) => [role, localModel])),
+    [localModel],
+  );
+  const catalog = catalogForModelSettings(settings);
+  const inventory = buildInventory([], catalog);
+  const localOnly = classifyPayload("Review this repo; password=hunter2", []).lane;
+  const route = routeRole({
+    requested: "coder",
+    objective: "Review this repo",
+    classification: { ...classifyPayload("Review this repo; password=hunter2", []), lane: localOnly },
+    inventory,
+    simulatePrimaryFailure: false,
+    failClosedWhenPrimaryMissing: true,
+    preventUnapprovedSubstitution: true,
+    catalog,
+  });
+  assert.equal(route.selectedModel, localModel);
+  assert.equal(route.selectedProvider, "ollama_local");
+});
+
+test("local-only work is blocked when the critic is Cloud", () => {
+  const settings = { ...defaultModelSettings(), coder: "llama3.1:8b" };
+  const catalog = catalogForModelSettings(settings);
+  const snapshot = evaluateDispatch(
+    { ...baseInput, role: "coder", objective: "Review this repo; password=hunter2" },
+    buildInventory([], catalog),
+    catalog,
+  );
+  assert.equal(snapshot.canCallModel, false);
+  assert.match(snapshot.blockReason ?? "", /local Ollama task model and local critic/);
 });
 
 test("skipped checks and critic rejection both prevent acceptance", () => {

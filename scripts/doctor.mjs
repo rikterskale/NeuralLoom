@@ -62,6 +62,13 @@ export function usableTaskRoles(primaryModels, installed) {
     .map(([role]) => role);
 }
 
+export function hasLocalReviewPath(installed) {
+  const localModels = installed.filter(
+    (model) => !model.endsWith(":cloud") && !model.endsWith("-cloud"),
+  );
+  return localModels.length > 0;
+}
+
 function configuredModels() {
   const source = readFileSync(join(root, "src", "lib", "harness", "spec.ts"), "utf8");
   return modelNamesFromSpec(source);
@@ -127,15 +134,18 @@ async function main() {
     const approved = configuredModels().filter((model) => installed.includes(model));
     const primaries = configuredPrimaryModels();
     const usableRoles = usableTaskRoles(primaries, installed);
-    if (usableRoles.length) {
+    const localPath = hasLocalReviewPath(installed);
+    if (usableRoles.length || localPath) {
       pass(
-        `${approved.length} approved model${approved.length === 1 ? " is" : "s are"} available; ` +
-          `${usableRoles.length} complete task review path${usableRoles.length === 1 ? " is" : "s are"} ready`,
+        localPath
+          ? "At least one local Ollama model is available; a local task-and-critic path can be selected in Models"
+          : `${approved.length} approved model${approved.length === 1 ? " is" : "s are"} available; ` +
+              `${usableRoles.length} complete task review path${usableRoles.length === 1 ? " is" : "s are"} ready`,
       );
     } else {
       fail("Ollama is running, but no complete task-and-critic review path is available");
       const starter = [primaries.coder, primaries.critic].filter(Boolean);
-      note("NeuralLoom uses Ollama Cloud models, which require an Ollama account.");
+      note("Choose an installed local model in Models, or configure the recommended Ollama Cloud models.");
       note("1. Sign in or create an account: ollama signin");
       starter.forEach((model, index) =>
         note(`${index + 2}. Add a starter model: ollama pull ${model}`),

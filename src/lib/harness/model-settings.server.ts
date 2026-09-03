@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db";
-import { defaultModelSettings, parseModelSettings } from "./spec";
+import { defaultModelSettings, parseModelSettings, parsePersistedModelSettings } from "./spec";
 import type { ModelSettings } from "./types";
 
 export async function readModelSettings(userId: string): Promise<ModelSettings> {
@@ -13,11 +13,15 @@ export async function readModelSettings(userId: string): Promise<ModelSettings> 
     typeof rows[0].settings === "string"
       ? (JSON.parse(rows[0].settings) as unknown)
       : rows[0].settings;
-  return parseModelSettings(value);
+  return parsePersistedModelSettings(value);
 }
 
-export async function writeModelSettings(userId: string, value: unknown): Promise<ModelSettings> {
-  const settings = parseModelSettings(value);
+export async function writeModelSettings(
+  userId: string,
+  value: unknown,
+  localModels: Iterable<string> = [],
+): Promise<ModelSettings> {
+  const settings = parseModelSettings(value, localModels);
   const sql = await getSql();
   await sql.query(
     `insert into neural_loom_model_settings (user_id, settings, updated_at)

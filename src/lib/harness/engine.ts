@@ -57,6 +57,10 @@ export function evaluateDispatch(
   const execution = evaluateExecution(input, classification);
   const authOk = authorizationSatisfied(classification, input.authorizationGranted);
   const redactOk = redactionSatisfied(classification, input.redactionVerified);
+  const critic = inventory.find((model) => model.name === catalog.critic.primary);
+  const localOnlyCriticReady =
+    classification.lane !== "local_only" ||
+    (critic?.available === true && critic.provider === "ollama_local");
 
   let status: RunStatus = "running";
   let blockReason: string | null = null;
@@ -64,9 +68,9 @@ export function evaluateDispatch(
   if (classification.lane === "unknown") {
     status = "blocked";
     blockReason = "Unknown data class blocked (deny by default).";
-  } else if (classification.lane === "local_only") {
+  } else if (classification.lane === "local_only" && !localOnlyCriticReady) {
     status = "blocked";
-    blockReason = "Local-only data cannot leave the operator workstation. Cloud transport refused.";
+    blockReason = "Local-only data requires a local Ollama task model and local critic.";
   } else if (!redactOk) {
     status = "blocked";
     blockReason = "require_redaction_verification — confirm redaction before the call.";
@@ -115,6 +119,7 @@ export function materializeRun(snapshot: PolicySnapshot): HarnessRun {
       {
         role: snapshot.route.role,
         candidate: snapshot.route.candidate,
+        provider: snapshot.route.selectedProvider,
         usedFallback: snapshot.route.usedFallback,
       },
     ),
