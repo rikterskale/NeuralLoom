@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { saveAndTestModelSettings } from "@/lib/harness/api";
+import { modelLocality, providerModelName } from "@/lib/harness/model-ref";
 import {
   defaultModelSettings,
   MODEL_CHOICES,
@@ -46,15 +47,23 @@ function ModelsPage() {
     discovery?.inventory.some((model) => model.name === selections.critic && model.available),
   );
   const allReady = readyRoles.length === 5 && reviewerReady;
-  const localChoices = useMemo(
+  const discoveredChoices = useMemo(
     () =>
       (discovery?.inventory ?? [])
-        .filter((model) => model.available && model.provider === "ollama_local")
-        .map((model) => ({
-          name: model.name,
-          label: "Installed locally",
-          description: "Runs on this computer through Ollama.",
-        })),
+        .filter((model) => model.available)
+        .map((model) =>
+          model.locality === "local"
+            ? {
+                name: model.name,
+                label: "Installed locally",
+                description: "Runs on this computer through Ollama.",
+              }
+            : {
+                name: model.name,
+                label: "Ollama Cloud",
+                description: "Available through your Ollama Cloud account.",
+              },
+        ),
     [discovery],
   );
   const checkByRole = useMemo(() => new Map(checks.map((check) => [check.role, check])), [checks]);
@@ -161,7 +170,7 @@ function ModelsPage() {
         {ROLE_IDS.map((role) => {
           const choices = [
             ...MODEL_CHOICES[role],
-            ...localChoices.filter(
+            ...discoveredChoices.filter(
               (choice) => !MODEL_CHOICES[role].some((approved) => approved.name === choice.name),
             ),
           ];
@@ -214,7 +223,7 @@ function ModelsPage() {
                     {selected.name}
                   </p>
                   <p className="mt-1 text-xs font-medium text-muted-foreground">
-                    {selected.name.endsWith(":cloud") || selected.name.endsWith("-cloud")
+                    {(record?.locality ?? modelLocality(selected.name)) === "cloud"
                       ? "Ollama Cloud"
                       : "Runs locally"}
                   </p>
@@ -305,7 +314,7 @@ function friendlyRoleName(role: RoleId): string {
 }
 
 function plainModelName(name: string): string {
-  return name.replace(":cloud", "").replaceAll("-", " ");
+  return providerModelName(name).replace(":cloud", "").replaceAll("-", " ");
 }
 
 function readinessMessage(error: string | null | undefined, available: boolean): string {

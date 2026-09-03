@@ -39,9 +39,9 @@ test("doctor recommends a faster starter model when one is approved", () => {
 });
 
 test("doctor extracts primary models by role", () => {
-  const source = `coder: { primary: "code:cloud", fallbacks: [] },
+  const source = `coder: { primary: "ollama/code:cloud", fallbacks: [] },
     critic: { primary: "review:cloud", fallbacks: [] },
-    fast_triage: { primary: "fast:cloud", fallbacks: [] }`;
+    fast_triage: { primary: "ollama/fast:cloud", fallbacks: [] }`;
   assert.deepEqual(rolePrimaryModelsFromSpec(source), {
     coder: "code:cloud",
     critic: "review:cloud",

@@ -60,7 +60,7 @@ export function evaluateDispatch(
   const critic = inventory.find((model) => model.name === catalog.critic.primary);
   const localOnlyCriticReady =
     classification.lane !== "local_only" ||
-    (critic?.available === true && critic.provider === "ollama_local");
+    (critic?.available === true && critic.locality === "local");
 
   let status: RunStatus = "running";
   let blockReason: string | null = null;

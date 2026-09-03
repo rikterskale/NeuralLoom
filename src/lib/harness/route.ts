@@ -58,6 +58,7 @@ export function routeRole(opts: {
       role,
       selectedModel: null,
       selectedProvider: null,
+      selectedLocality: null,
       candidate: config.primary,
       usedFallback: false,
       fallbackReason: null,
@@ -73,6 +74,7 @@ export function routeRole(opts: {
         role,
         selectedModel: null,
         selectedProvider: null,
+        selectedLocality: null,
         candidate: config.primary,
         usedFallback: false,
         fallbackReason: null,
@@ -89,7 +91,7 @@ export function routeRole(opts: {
     const name = chain[i];
     const rec = available.get(name);
     if (!rec?.available) continue;
-    if (localOnly && rec.provider !== "ollama_local") continue;
+    if (localOnly && rec.locality !== "local") continue;
     if (opts.preventUnapprovedSubstitution && !chain.includes(name)) {
       continue;
     }
@@ -97,6 +99,7 @@ export function routeRole(opts: {
       role,
       selectedModel: name,
       selectedProvider: rec.provider,
+      selectedLocality: rec.locality,
       candidate: config.primary,
       usedFallback: i > 0,
       fallbackReason:
@@ -114,13 +117,14 @@ export function routeRole(opts: {
     role,
     selectedModel: null,
     selectedProvider: null,
+    selectedLocality: null,
     candidate: config.primary,
     usedFallback: startAt > 0,
     fallbackReason: opts.simulatePrimaryFailure ? `Primary ${config.primary} call failed` : null,
     denied: true,
     denyReason:
       localOnly
-        ? "Local-only data requires an available local Ollama model for this role."
+        ? "Local-only data requires an available local model for this role."
         : "No approved model in the role chain is available. Unapproved substitution is forbidden.",
   };
 }

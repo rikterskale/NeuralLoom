@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { GROK_EXTENSIONS_SCRIPT_SRC } from "./grok-pwa-shared.mjs";
+import { providerModelName } from "../src/lib/harness/model-ref.ts";
 import { allConfiguredModels, defaultModelSettings } from "../src/lib/harness/spec.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -512,7 +513,8 @@ async function startMockOllama(stats: {
   tagRequests: number;
   chatCalls: Array<{ model: string; critic: boolean }>;
 }) {
-  const models = allConfiguredModels();
+  // The mock daemon speaks Ollama's own naming, so serve bare model names.
+  const models = allConfiguredModels().map(providerModelName);
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (request.method === "GET" && url.pathname === "/api/tags") {

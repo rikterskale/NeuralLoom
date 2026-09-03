@@ -49,7 +49,9 @@ export function rolePrimaryModelsFromSpec(source) {
   const result = {};
   for (const role of roles) {
     const block = source.match(new RegExp(`${role}:\\s*\\{[\\s\\S]*?primary:\\s*"([^"]+)"`));
-    if (block) result[role] = block[1];
+    // The spec stores qualified "ollama/<model>" references; the daemon and
+    // `ollama pull` use the bare name.
+    if (block) result[role] = block[1].replace(/^ollama\//, "");
   }
   return result;
 }

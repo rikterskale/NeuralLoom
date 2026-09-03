@@ -6,7 +6,7 @@ import { parseCriticVerdict } from "./critic";
 import { evaluateDispatch, materializeRun } from "./engine";
 import { readModelSettings, writeModelSettings } from "./model-settings.server";
 import { criticSystemPrompt, roleSystemPrompt } from "./prompts";
-import { callOllama, discoverModels, type ModelCompletion } from "./provider.server";
+import { completeModel, discoverModels, type ModelCompletion } from "./provider.server";
 import { catalogForModelSettings, parseModelSettings, ROLE_CATALOG } from "./spec";
 import type {
   AuditEvent,
@@ -43,11 +43,11 @@ export const saveAndTestModelSettings = createServerFn({ method: "POST" })
   .validator((value: unknown) => value)
   .handler(async ({ data, context }): Promise<ModelSettingsResult> => {
     const initialDiscovery = await discoverModels(true, ROLE_CATALOG);
-    const localModels = initialDiscovery.inventory
-      .filter((model) => model.available && model.provider === "ollama_local")
+    const discoveredModels = initialDiscovery.inventory
+      .filter((model) => model.available)
       .map((model) => model.name);
-    const settings = parseModelSettings(data, localModels);
-    await writeModelSettings(context.userId, settings, localModels);
+    const settings = parseModelSettings(data, discoveredModels);
+    await writeModelSettings(context.userId, settings, discoveredModels);
     const discovery = await discoverModels(true, catalogForModelSettings(settings));
     const available = new Set(
       discovery.inventory.filter((model) => model.available).map((model) => model.name),
@@ -106,7 +106,7 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
         system: roleSystemPrompt(run.role),
         user: buildUserPrompt(run, data),
         maxTokens: run.role === "fast_triage" ? 500 : 900,
-        allowedProvider: run.classification.lane === "local_only" ? "ollama_local" : null,
+        allowedLocality: run.classification.lane === "local_only" ? "local" : null,
         catalog,
       });
       run = applyActualRoute(run, primary);
@@ -127,7 +127,7 @@ export const dispatchHarnessRun = createServerFn({ method: "POST" })
         system: criticSystemPrompt(),
         user: `Review this ${run.role} artifact.\n\n${primary.completion.text}`,
         maxTokens: 500,
-        allowedProvider: run.classification.lane === "local_only" ? "ollama_local" : null,
+        allowedLocality: run.classification.lane === "local_only" ? "local" : null,
         catalog,
       });
       const verdict = parseCriticVerdict(critic.completion.text);
@@ -220,7 +220,7 @@ async function completeRoleWithFallback(opts: {
   system: string;
   user: string;
   maxTokens: number;
-  allowedProvider: "ollama_local" | "ollama_cloud" | null;
+  allowedLocality: "local" | null;
   catalog?: Record<RoleId, RoleConfig>;
 }): Promise<CompletionRoute> {
   const config = (opts.catalog ?? ROLE_CATALOG)[opts.role];
@@ -233,14 +233,14 @@ async function completeRoleWithFallback(opts: {
     const model = approved[index];
     const record = records.get(model);
     if (!record?.available) continue;
-    if (opts.allowedProvider && record.provider !== opts.allowedProvider) continue;
+    if (opts.allowedLocality && record.locality !== opts.allowedLocality) continue;
     if (opts.simulatePrimaryFailure && index === 0) {
       lastError = `Primary ${model} failure simulated`;
       continue;
     }
     try {
-      const completion = await callOllama({
-        model,
+      const completion = await completeModel({
+        ref: model,
         expectedDigest: record.digest,
         system: opts.system,
         user: opts.user,

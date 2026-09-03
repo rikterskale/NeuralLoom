@@ -1,5 +1,5 @@
+import { modelLocality, normalizeModelRef, parseModelRef } from "./model-ref.ts";
 import type {
-  ModelProvider,
   ModelRecord,
   ModelSettings,
   RoleConfig,
@@ -73,8 +73,8 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   planner: {
     id: "planner",
     label: "Planner",
-    primary: "deepseek-v4-pro:0813-cloud",
-    fallbacks: ["deepseek-v4-flash:0731-cloud", "qwen3.5:397b-cloud"],
+    primary: "ollama/deepseek-v4-pro:0813-cloud",
+    fallbacks: ["ollama/deepseek-v4-flash:0731-cloud", "ollama/qwen3.5:397b-cloud"],
     think: "high",
     temperature: 0.15,
     responsibilities: [
@@ -89,8 +89,8 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   coder: {
     id: "coder",
     label: "Coder",
-    primary: "kimi-k2.7-code:cloud",
-    fallbacks: ["glm-5.3:cloud", "qwen3.5:397b-cloud"],
+    primary: "ollama/kimi-k2.7-code:cloud",
+    fallbacks: ["ollama/glm-5.3:cloud", "ollama/qwen3.5:397b-cloud"],
     think: "high",
     temperature: 0.15,
     responsibilities: [
@@ -106,8 +106,8 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   repo_agent: {
     id: "repo_agent",
     label: "Repo agent",
-    primary: "glm-5.3:cloud",
-    fallbacks: ["kimi-k3:cloud", "mistral-large-3:675b-cloud", "qwen3.5:397b-cloud"],
+    primary: "ollama/glm-5.3:cloud",
+    fallbacks: ["ollama/kimi-k3:cloud", "ollama/mistral-large-3:675b-cloud", "ollama/qwen3.5:397b-cloud"],
     think: "max",
     temperature: 0.1,
     responsibilities: [
@@ -123,8 +123,8 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   security_specialist: {
     id: "security_specialist",
     label: "Security specialist",
-    primary: "glm-5.3:cloud",
-    fallbacks: ["kimi-k2.7-code:cloud", "qwen3.5:397b-cloud"],
+    primary: "ollama/glm-5.3:cloud",
+    fallbacks: ["ollama/kimi-k2.7-code:cloud", "ollama/qwen3.5:397b-cloud"],
     think: "max",
     temperature: 0.1,
     responsibilities: [
@@ -139,8 +139,8 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   critic: {
     id: "critic",
     label: "Critic",
-    primary: "gemma4:31b-cloud",
-    fallbacks: ["qwen3.5:397b-cloud", "mistral-large-3:675b-cloud"],
+    primary: "ollama/gemma4:31b-cloud",
+    fallbacks: ["ollama/qwen3.5:397b-cloud", "ollama/mistral-large-3:675b-cloud"],
     think: "high",
     temperature: 0.1,
     responsibilities: [
@@ -156,8 +156,8 @@ export const ROLE_CATALOG: Record<RoleId, RoleConfig> = {
   fast_triage: {
     id: "fast_triage",
     label: "Fast triage",
-    primary: "deepseek-v4-flash:0731-cloud",
-    fallbacks: ["qwen3.5:397b-cloud"],
+    primary: "ollama/deepseek-v4-flash:0731-cloud",
+    fallbacks: ["ollama/qwen3.5:397b-cloud"],
     think: "low",
     temperature: 0.1,
     responsibilities: [
@@ -176,109 +176,106 @@ export type ModelChoice = {
   description: string;
 };
 
-export function modelProvider(name: string): ModelProvider {
-  return name.endsWith(":cloud") || name.endsWith("-cloud") ? "ollama_cloud" : "ollama_local";
-}
 
 export const MODEL_CHOICES: Record<RoleId, ModelChoice[]> = {
   planner: [
     {
-      name: "deepseek-v4-pro:0813-cloud",
+      name: "ollama/deepseek-v4-pro:0813-cloud",
       label: "Recommended",
       description: "Best for careful plans and difficult decisions.",
     },
     {
-      name: "deepseek-v4-flash:0731-cloud",
+      name: "ollama/deepseek-v4-flash:0731-cloud",
       label: "Faster",
       description: "Quicker answers for everyday planning.",
     },
     {
-      name: "qwen3.5:397b-cloud",
+      name: "ollama/qwen3.5:397b-cloud",
       label: "Alternative",
       description: "A strong general-purpose backup.",
     },
   ],
   coder: [
     {
-      name: "kimi-k2.7-code:cloud",
+      name: "ollama/kimi-k2.7-code:cloud",
       label: "Recommended",
       description: "Best balance for writing and reviewing code.",
     },
     {
-      name: "glm-5.3:cloud",
+      name: "ollama/glm-5.3:cloud",
       label: "More thorough",
       description: "Useful for larger or more complex changes.",
     },
     {
-      name: "qwen3.5:397b-cloud",
+      name: "ollama/qwen3.5:397b-cloud",
       label: "Alternative",
       description: "A strong general-purpose backup.",
     },
   ],
   repo_agent: [
     {
-      name: "glm-5.3:cloud",
+      name: "ollama/glm-5.3:cloud",
       label: "Recommended",
       description: "Best for understanding a whole project.",
     },
     {
-      name: "kimi-k3:cloud",
+      name: "ollama/kimi-k3:cloud",
       label: "Faster",
       description: "Good for quicker project-wide questions.",
     },
     {
-      name: "mistral-large-3:675b-cloud",
+      name: "ollama/mistral-large-3:675b-cloud",
       label: "More thorough",
       description: "Good for deep project analysis.",
     },
     {
-      name: "qwen3.5:397b-cloud",
+      name: "ollama/qwen3.5:397b-cloud",
       label: "Alternative",
       description: "A strong general-purpose backup.",
     },
   ],
   security_specialist: [
     {
-      name: "glm-5.3:cloud",
+      name: "ollama/glm-5.3:cloud",
       label: "Recommended",
       description: "Best for careful security review.",
     },
     {
-      name: "kimi-k2.7-code:cloud",
+      name: "ollama/kimi-k2.7-code:cloud",
       label: "Code focused",
       description: "Best when the security task is mostly code.",
     },
     {
-      name: "qwen3.5:397b-cloud",
+      name: "ollama/qwen3.5:397b-cloud",
       label: "Alternative",
       description: "A strong general-purpose backup.",
     },
   ],
   critic: [
     {
-      name: "gemma4:31b-cloud",
+      name: "ollama/gemma4:31b-cloud",
       label: "Recommended",
       description: "Independent second opinion for every task.",
     },
     {
-      name: "qwen3.5:397b-cloud",
+      name: "ollama/qwen3.5:397b-cloud",
       label: "Faster",
       description: "A quicker independent review.",
     },
     {
-      name: "mistral-large-3:675b-cloud",
+      name: "ollama/mistral-large-3:675b-cloud",
       label: "More thorough",
       description: "A deeper independent review.",
     },
   ],
   fast_triage: [
     {
-      name: "deepseek-v4-flash:0731-cloud",
+      name: "ollama/deepseek-v4-flash:0731-cloud",
       label: "Recommended",
       description: "Fastest choice for sorting and summarizing.",
     },
     {
-      name: "qwen3.5:397b-cloud",
+      name: "ollama/qwen3.5:397b-cloud",
       label: "Alternative",
       description: "A strong general-purpose backup.",
     },
@@ -289,18 +286,24 @@ export function defaultModelSettings(): ModelSettings {
   return Object.fromEntries(ROLE_IDS.map((id) => [id, ROLE_CATALOG[id].primary])) as ModelSettings;
 }
 
-export function parseModelSettings(value: unknown, localModels: Iterable<string> = []): ModelSettings {
+// A role may use a curated choice or any model the configured providers
+// actually discovered — local or cloud. Anything else stays rejected, so the
+// approved set is always something the user explicitly picked from inventory.
+export function parseModelSettings(
+  value: unknown,
+  discoveredModels: Iterable<string> = [],
+): ModelSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Choose one model for every role.");
   }
   const raw = value as Record<string, unknown>;
+  const discovered = new Set(discoveredModels);
   const settings = {} as ModelSettings;
   for (const id of ROLE_IDS) {
     const model = raw[id];
     if (
       typeof model !== "string" ||
-      (!MODEL_CHOICES[id].some((choice) => choice.name === model) &&
-        !new Set(localModels).has(model))
+      (!MODEL_CHOICES[id].some((choice) => choice.name === model) && !discovered.has(model))
     ) {
       throw new Error(`The selected model does not work with ${ROLE_CATALOG[id].label}.`);
     }
@@ -320,7 +323,8 @@ export function parsePersistedModelSettings(value: unknown): ModelSettings {
     if (typeof model !== "string" || !model.trim()) {
       throw new Error("Saved model settings are invalid.");
     }
-    settings[id] = model;
+    // Settings saved before qualified references used bare Ollama names.
+    settings[id] = normalizeModelRef(model);
   }
   return settings;
 }
@@ -375,7 +379,8 @@ export function buildInventory(
     name,
     digest: "unverified",
     available: !unavailable.includes(name),
-    provider: modelProvider(name),
+    provider: parseModelRef(name).provider,
+    locality: modelLocality(name),
     source: "configured" as const,
     usedBy: usage[name] ?? [],
   }));

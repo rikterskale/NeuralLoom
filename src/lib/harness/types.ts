@@ -18,7 +18,16 @@ export const TASK_ROLE_IDS = [
 export type TaskRoleId = (typeof TASK_ROLE_IDS)[number];
 
 export type ThinkLevel = "low" | "high" | "max";
-export type ModelProvider = "ollama_local" | "ollama_cloud";
+
+// Provider ids double as the prefix of a qualified model reference
+// ("<provider>/<model>"). Adding a provider means adding an adapter under
+// providers/ and registering its id here.
+export const PROVIDER_IDS = ["ollama"] as const;
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+
+// Locality, not provider identity, is what the data-lane guards key off:
+// local_only material may never reach a model whose locality is "cloud".
+export type ModelLocality = "local" | "cloud";
 
 export const CLOUD_PERMITTED = [
   "public_repositories",
@@ -149,7 +158,8 @@ export type ModelRecord = {
   name: string;
   digest: string;
   available: boolean;
-  provider: ModelProvider;
+  provider: ProviderId;
+  locality: ModelLocality;
   source: "configured" | "discovered";
   usedBy: RoleId[];
 };
@@ -166,7 +176,8 @@ export type Classification = {
 export type RouteDecision = {
   role: RoleId;
   selectedModel: string | null;
-  selectedProvider: ModelProvider | null;
+  selectedProvider: ProviderId | null;
+  selectedLocality: ModelLocality | null;
   candidate: string;
   usedFallback: boolean;
   fallbackReason: string | null;
@@ -260,11 +271,21 @@ export type HarnessRun = {
   operatorAccepted: boolean;
 };
 
+export type ProviderStatus = {
+  id: ProviderId;
+  label: string;
+  configured: boolean;
+  endpoint: string | null;
+  error: string | null;
+};
+
 export type ModelDiscovery = {
   inventory: ModelRecord[];
   roleModels: ModelSettings;
   discoveredAt: string;
-  provider: "ollama";
+  providers: ProviderStatus[];
+  // Convenience mirrors of the Ollama provider status, which most of the UI
+  // messaging is written around.
   endpoint: string;
   error: string | null;
 };

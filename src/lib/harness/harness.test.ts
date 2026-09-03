@@ -9,6 +9,7 @@ import {
   catalogForModelSettings,
   defaultModelSettings,
   parseModelSettings,
+  parsePersistedModelSettings,
   readyTaskRoles,
   ROLE_CATALOG,
 } from "./spec.ts";
@@ -97,8 +98,8 @@ test("readiness requires a task primary and the critic primary", () => {
 test("model settings accept approved choices and drive runtime routing", () => {
   const settings = {
     ...defaultModelSettings(),
-    coder: "glm-5.3:cloud",
-    critic: "qwen3.5:397b-cloud",
+    coder: "ollama/glm-5.3:cloud",
+    critic: "ollama/qwen3.5:397b-cloud",
   };
   assert.deepEqual(parseModelSettings(settings), settings);
   assert.throws(
@@ -112,12 +113,36 @@ test("model settings accept approved choices and drive runtime routing", () => {
     buildInventory([], catalog),
     catalog,
   );
-  assert.equal(snapshot.route.selectedModel, "glm-5.3:cloud");
-  assert.equal(catalog.critic.primary, "qwen3.5:397b-cloud");
+  assert.equal(snapshot.route.selectedModel, "ollama/glm-5.3:cloud");
+  assert.equal(catalog.critic.primary, "ollama/qwen3.5:397b-cloud");
+});
+
+test("any discovered Ollama Cloud model can be approved for a role", () => {
+  const cloudModel = "ollama/brand-new-model:120b-cloud";
+  const settings = parseModelSettings(
+    { ...defaultModelSettings(), coder: cloudModel },
+    [cloudModel],
+  );
+  assert.equal(settings.coder, cloudModel);
+  assert.throws(
+    () => parseModelSettings({ ...defaultModelSettings(), coder: cloudModel }),
+    /does not work with Coder/,
+  );
+});
+
+test("persisted bare model names migrate to qualified ollama references", () => {
+  const migrated = parsePersistedModelSettings({
+    ...defaultModelSettings(),
+    coder: "llama3.1:8b",
+    critic: "gemma4:31b-cloud",
+  });
+  assert.equal(migrated.coder, "ollama/llama3.1:8b");
+  assert.equal(migrated.critic, "ollama/gemma4:31b-cloud");
+  assert.equal(migrated.planner, defaultModelSettings().planner);
 });
 
 test("installed local models can be selected and route local-only work locally", () => {
-  const localModel = "llama3.1:8b";
+  const localModel = "ollama/llama3.1:8b";
   const settings = parseModelSettings(
     Object.fromEntries(Object.keys(defaultModelSettings()).map((role) => [role, localModel])),
     [localModel],
@@ -136,11 +161,12 @@ test("installed local models can be selected and route local-only work locally",
     catalog,
   });
   assert.equal(route.selectedModel, localModel);
-  assert.equal(route.selectedProvider, "ollama_local");
+  assert.equal(route.selectedProvider, "ollama");
+  assert.equal(route.selectedLocality, "local");
 });
 
 test("local-only work is blocked when the critic is Cloud", () => {
-  const settings = { ...defaultModelSettings(), coder: "llama3.1:8b" };
+  const settings = { ...defaultModelSettings(), coder: "ollama/llama3.1:8b" };
   const catalog = catalogForModelSettings(settings);
   const snapshot = evaluateDispatch(
     { ...baseInput, role: "coder", objective: "Review this repo; password=hunter2" },

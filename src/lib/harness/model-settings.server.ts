@@ -19,9 +19,9 @@ export async function readModelSettings(userId: string): Promise<ModelSettings> 
 export async function writeModelSettings(
   userId: string,
   value: unknown,
-  localModels: Iterable<string> = [],
+  discoveredModels: Iterable<string> = [],
 ): Promise<ModelSettings> {
-  const settings = parseModelSettings(value, localModels);
+  const settings = parseModelSettings(value, discoveredModels);
   const sql = await getSql();
   await sql.query(
     `insert into neural_loom_model_settings (user_id, settings, updated_at)

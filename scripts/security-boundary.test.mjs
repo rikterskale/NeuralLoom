@@ -4,7 +4,7 @@ import test from "node:test";
 
 const api = readFileSync(new URL("../src/lib/harness/api.ts", import.meta.url), "utf8");
 const provider = readFileSync(
-  new URL("../src/lib/harness/provider.server.ts", import.meta.url),
+  new URL("../src/lib/harness/providers/ollama.server.ts", import.meta.url),
   "utf8",
 );
 

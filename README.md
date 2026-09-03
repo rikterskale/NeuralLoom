@@ -33,7 +33,7 @@ ollama pull gemma4:31b-cloud
 npm run doctor
 ```
 
-Do not continue until the doctor ends with `Ready. Run: npm run dev`. Open **Models** after startup to choose an installed local model or an approved Cloud model for each role. Local-only data is sent only to local models, including the independent critic.
+Do not continue until the doctor ends with `Ready. Run: npm run dev`. Open **Models** after startup to choose a model for each role: any installed local model or any Ollama Cloud model you have pulled, alongside the recommended defaults. Local-only data is sent only to local models, including the independent critic.
 
 ### 3. Start the app
 

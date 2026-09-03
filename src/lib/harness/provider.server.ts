@@ -1,169 +1,131 @@
-import {
-  allConfiguredModels,
-  modelProvider,
-  modelUsage,
-  roleModelsFromCatalog,
-  ROLE_CATALOG,
-} from "./spec";
-import type { ModelDiscovery, ModelRecord, RoleConfig, RoleId } from "./types";
+import { formatModelRef, modelLocality, parseModelRef } from "./model-ref";
+import { activeAdapters, adapterFor } from "./providers/registry.server";
+import type { ModelCompletion } from "./providers/types";
+import { allConfiguredModels, modelUsage, roleModelsFromCatalog, ROLE_CATALOG } from "./spec";
+import type {
+  ModelDiscovery,
+  ModelLocality,
+  ModelRecord,
+  ProviderId,
+  ProviderStatus,
+  RoleConfig,
+  RoleId,
+} from "./types";
 
-const DEFAULT_ENDPOINT = "http://127.0.0.1:11434";
+export type { ModelCompletion } from "./providers/types";
+
 const DISCOVERY_TTL_MS = 60 * 60 * 1000;
 
-type OllamaTag = { name?: unknown; model?: unknown; digest?: unknown };
-type DiscoveryCache = {
+type FoundModel = { digest: string; locality: ModelLocality };
+type ProviderCacheEntry = {
   at: number;
-  found: Map<string, { digest: string }>;
-  error: string | null;
-  endpoint: string;
+  found: Map<string, FoundModel>;
+  status: ProviderStatus;
 };
 
 const globalProvider = globalThis as typeof globalThis & {
-  __neuralLoomDiscovery__?: DiscoveryCache;
+  __neuralLoomProviderDiscovery__?: Map<ProviderId, ProviderCacheEntry>;
 };
 
-function endpoint(): URL {
-  const raw = process.env.OLLAMA_BASE_URL?.trim() || DEFAULT_ENDPOINT;
-  const url = new URL(raw);
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("OLLAMA_BASE_URL must use http or https");
-  }
-  const loopback = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname);
-  if (!loopback && process.env.OLLAMA_ALLOW_REMOTE !== "true") {
-    throw new Error("Remote Ollama endpoints require OLLAMA_ALLOW_REMOTE=true");
-  }
-  return url;
+function cache(): Map<ProviderId, ProviderCacheEntry> {
+  globalProvider.__neuralLoomProviderDiscovery__ ??= new Map();
+  return globalProvider.__neuralLoomProviderDiscovery__;
 }
 
-function publicEndpoint(url: URL): string {
-  return `${url.protocol}//${url.host}`;
+// One provider being down or misconfigured must never block the others: each
+// adapter is queried independently and failures land in its ProviderStatus.
+async function discoverProvider(force: boolean, id: ProviderId): Promise<ProviderCacheEntry> {
+  const cached = cache().get(id);
+  if (!force && cached && Date.now() - cached.at < DISCOVERY_TTL_MS) return cached;
+
+  const adapter = adapterFor(id);
+  const found = new Map<string, FoundModel>();
+  let error: string | null = null;
+  if (adapter.configured()) {
+    try {
+      for (const model of await adapter.listModels()) {
+        found.set(formatModelRef(id, model.model), {
+          digest: model.digest,
+          locality: model.locality,
+        });
+      }
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : "Model discovery failed";
+    }
+  } else {
+    error = `${adapter.label} is not configured`;
+  }
+
+  const entry: ProviderCacheEntry = {
+    at: Date.now(),
+    found,
+    status: {
+      id,
+      label: adapter.label,
+      configured: adapter.configured(),
+      endpoint: adapter.endpoint(),
+      error,
+    },
+  };
+  cache().set(id, entry);
+  return entry;
 }
 
 export async function discoverModels(
   force = false,
   catalog: Record<RoleId, RoleConfig> = ROLE_CATALOG,
 ): Promise<ModelDiscovery> {
-  const cached = globalProvider.__neuralLoomDiscovery__;
-  if (!force && cached && Date.now() - cached.at < DISCOVERY_TTL_MS) {
-    return buildDiscovery(catalog, cached.found, cached.error, cached.endpoint, cached.at);
+  const entries = await Promise.all(
+    activeAdapters().map((adapter) => discoverProvider(force, adapter.id)),
+  );
+  const providers = entries.map((entry) => entry.status);
+  const found = new Map<string, FoundModel>();
+  for (const entry of entries) {
+    for (const [ref, model] of entry.found) found.set(ref, model);
   }
 
-  const url = endpoint();
-  let found = new Map<string, { digest: string }>();
-  let error: string | null = null;
-
-  try {
-    const response = await fetch(new URL("/api/tags", url), {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) throw new Error(`Ollama discovery returned HTTP ${response.status}`);
-    const body = (await response.json()) as { models?: OllamaTag[] };
-    found = new Map<string, { digest: string }>();
-    for (const item of body.models ?? []) {
-      const name =
-        typeof item.name === "string"
-          ? item.name
-          : typeof item.model === "string"
-            ? item.model
-            : null;
-      if (!name) continue;
-      found.set(name, {
-        digest: typeof item.digest === "string" && item.digest ? item.digest : "unverified",
-      });
-    }
-  } catch (cause) {
-    error = cause instanceof Error ? cause.message : "Model discovery failed";
-  }
-
-  const publicUrl = publicEndpoint(url);
-  globalProvider.__neuralLoomDiscovery__ = {
-    at: Date.now(),
-    found,
-    error,
-    endpoint: publicUrl,
-  };
-  return buildDiscovery(catalog, found, error, publicUrl, Date.now());
-}
-
-function buildDiscovery(
-  catalog: Record<RoleId, RoleConfig>,
-  found: Map<string, { digest: string }>,
-  error: string | null,
-  endpointUrl: string,
-  discoveredAt: number,
-): ModelDiscovery {
   const usage = modelUsage(catalog);
   const names = [...new Set([...allConfiguredModels(catalog), ...found.keys()])];
-  const inventory: ModelRecord[] = names.map((name) => ({
-    name,
-    digest: found.get(name)?.digest ?? "unavailable",
-    available: found.has(name),
-    provider: modelProvider(name),
-    source: found.has(name) ? "discovered" : "configured",
-    usedBy: usage[name] ?? [],
-  }));
+  const inventory: ModelRecord[] = names.map((name) => {
+    const record = found.get(name);
+    return {
+      name,
+      digest: record?.digest ?? "unavailable",
+      available: Boolean(record),
+      provider: parseModelRef(name).provider,
+      locality: record?.locality ?? modelLocality(name),
+      source: record ? ("discovered" as const) : ("configured" as const),
+      usedBy: usage[name] ?? [],
+    };
+  });
+
+  const ollama = providers.find((provider) => provider.id === "ollama");
   return {
     inventory,
     roleModels: roleModelsFromCatalog(catalog),
-    discoveredAt: new Date(discoveredAt).toISOString(),
-    provider: "ollama",
-    endpoint: endpointUrl,
-    error,
+    discoveredAt: new Date().toISOString(),
+    providers,
+    endpoint: ollama?.endpoint ?? "",
+    error: ollama?.error ?? null,
   };
 }
 
-export type ModelCompletion = {
-  text: string;
-  model: string;
-  digest: string;
-  usage: { prompt: number; completion: number; total: number };
-};
-
-export async function callOllama(opts: {
-  model: string;
+export async function completeModel(opts: {
+  ref: string;
   system: string;
   user: string;
   temperature: number;
   maxTokens: number;
   expectedDigest: string;
 }): Promise<ModelCompletion> {
-  const url = endpoint();
-  const response = await fetch(new URL("/api/chat", url), {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({
-      model: opts.model,
-      stream: false,
-      messages: [
-        { role: "system", content: opts.system },
-        { role: "user", content: opts.user },
-      ],
-      options: { temperature: opts.temperature, num_predict: opts.maxTokens },
-    }),
-    signal: AbortSignal.timeout(120_000),
+  const { provider, model } = parseModelRef(opts.ref);
+  const completion = await adapterFor(provider).complete({
+    model,
+    system: opts.system,
+    user: opts.user,
+    temperature: opts.temperature,
+    maxTokens: opts.maxTokens,
+    expectedDigest: opts.expectedDigest,
   });
-  if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}`);
-  const body = (await response.json()) as {
-    model?: unknown;
-    message?: { content?: unknown };
-    prompt_eval_count?: unknown;
-    eval_count?: unknown;
-  };
-  const runtimeModel = typeof body.model === "string" ? body.model : "";
-  if (runtimeModel !== opts.model) {
-    throw new Error(
-      `Model identity mismatch: expected ${opts.model}, received ${runtimeModel || "unknown"}`,
-    );
-  }
-  const text = typeof body.message?.content === "string" ? body.message.content : "";
-  if (!text.trim()) throw new Error("Ollama returned an empty response");
-  const prompt = typeof body.prompt_eval_count === "number" ? body.prompt_eval_count : 0;
-  const completion = typeof body.eval_count === "number" ? body.eval_count : 0;
-  return {
-    text,
-    model: runtimeModel,
-    digest: opts.expectedDigest,
-    usage: { prompt, completion, total: prompt + completion },
-  };
+  return { ...completion, model: formatModelRef(provider, completion.model) };
 }
